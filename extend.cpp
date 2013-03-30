@@ -16,6 +16,26 @@ bool Junction::isCanonical(){
 	return !(strcmp(signal, "GTAG") && strcmp(signal, "GCAG") && strcmp(signal, "ATAC") && strcmp(signal, "CTAC") && strcmp(signal, "CTGC") && strcmp(signal, "GTAT"));
 }
 
+int Canonical_Score(char* signal)
+{
+	if(!strcmp(signal, "GTAG") || !strcmp(signal, "CTAC"))
+	{
+		return 3;
+	}	
+	else if(!strcmp(signal, "GCAG") || !strcmp(signal, "CTGC"))
+	{
+		return 2;
+	}	
+	else if(!strcmp(signal, "ATAC") || !strcmp(signal, "GTAT"))
+	{
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
+	//return !(&& && 
+}
 /*int main(int argc, char* argv[]){
 	loadPac("test.fasta.pac");
 	//printf("%s\n",Original_Text);
@@ -123,7 +143,7 @@ float getScore(unsigned p, unsigned q, unsigned x, int size, int i, int misL, in
 	Location_To_Genome(juncEnd,A1);
 	Location_To_Genome(p, A1);
 	Location_To_Genome(q, A1);
-	printf("%s\t%u\t%u\t%d\t%d\t%u\t%u\t%s\t%s\t%f\t%d\t%d\t%c\t%s\n",A.Name,p,q,size,i,juncStart, juncEnd,donorStr,accStr,score,misL,misR,sign,signal);
+	//printf("%s\t%u\t%u\t%d\t%d\t%u\t%u\t%s\t%s\t%f\t%d\t%d\t%c\t%s\n",A.Name,p,q,size,i,juncStart, juncEnd,donorStr,accStr,score,misL,misR,sign,signal);
 
 	return score;
 }
@@ -175,16 +195,37 @@ Junction* extend(char* R, unsigned x, unsigned y, unsigned p, unsigned q, char s
 
 	//Find the partitions that give the minimum mismatches.
 	//Partitions store the size of the portion of the left extension.
-	int min= misL[0] + misR[0];
-	//float max = getScore(p,q,x,size,0,misL[0],misR[0],sign);
-	int parCount = 0;
+	int min= misL[0] + misR[0],Sig_Score=0;
+	int Can_min= misL[0] + misR[0];
+	int parCount = 0,Canonical_parcount=0;
 	int partitions[size+1];
-	partitions[0] = 0;
+	int Canonical_partitions[size+1];
+	partitions[0] = 0;Canonical_partitions[0] = 0;
+
+
 	for(int i=1; i<size+1; i++)
 	{
-		//printf("%d\n",min);
 		int temp = misL[i]+misR[i];
-		//float temp = getScore(p,q,x,size,i,misL[i],misR[i],sign);
+		char Sig[5];
+		Sig[0]=basesL[i];Sig[1]=basesL[i+1];Sig[2]=basesR[i-2];Sig[3]=basesR[i-1];Sig[4]=0;
+		int TSig_Score=Canonical_Score(Sig);
+
+		if(TSig_Score)//Canonical juncs found..	
+		{
+			if(temp == Can_min)
+			{
+				Canonical_partitions[Canonical_parcount] = i;
+				++Canonical_parcount;
+			}
+			else if(temp < Can_min || Sig_Score<TSig_Score)
+			{
+				Canonical_parcount = 1;
+				Can_min = temp;
+				Sig_Score=TSig_Score;
+				Canonical_partitions[0] = i;
+			}
+		}
+
 		if(DEBUG)
 		{
 			if(temp<=MIS_DENSITY)
@@ -216,27 +257,48 @@ Junction* extend(char* R, unsigned x, unsigned y, unsigned p, unsigned q, char s
 	//Find the junctions based on the partitions obtained
 	//assert(min>=0 && min<=MINX+1);
 	Junction *junctions = new Junction[parCount+1];
+	bool Can_Junctions=false;
 	for(int i = 0; i<parCount; i++)
 	{
 		junctions[i].p = p + x + partitions[i] + 1;
 		junctions[i].q = q - size + partitions[i] - 1;
 		junctions[i].r = x + partitions[i] + 1;
 		junctions[i].score = getScore(p,q,x,size,partitions[i],misL[partitions[i]],misR[partitions[i]],sign);
-		//junctions[i].Mismatches = min;
 		junctions[i].Mismatches = misL[partitions[i]] + misR[partitions[i]];
 		char signal[5];
 		signal[4] = 0;
 		Get_Bases_ASCII(junctions[i].p,2,signal);
 		Get_Bases_ASCII(junctions[i].q-1,2,signal+2);
-		//strcpy(donor,"GTAG");
 		strcpy(junctions[i].signal, signal);
-		//printf("%d\t%d\t%d\t%s\n",junctions[i].p,junctions[i].q,junctions[i].r,junctions[i].signal);
-		//if(junctions[i].isCanonical())
-		//	printf("canonical\n");
-		//else
-		//	printf("non-canonical\n");
+		if(junctions[i].isCanonical())
+			Can_Junctions=true;
 	}
 	junctions[parCount].p = UINT_MAX;
+	
+	if(!Can_Junctions && Canonical_parcount && Can_min-1<=min)
+	{
+		if(parCount<Canonical_parcount);
+		{
+			delete [] junctions;
+			junctions = new Junction[Canonical_parcount+1];
+		}
+		for(int i = 0; i<Canonical_parcount; i++)
+		{
+			junctions[i].p = p + x + Canonical_partitions[i] + 1;
+			junctions[i].q = q - size + Canonical_partitions[i] - 1;
+			junctions[i].r = x + Canonical_partitions[i] + 1;
+			junctions[i].score = getScore(p,q,x,size,Canonical_partitions[i],misL[Canonical_partitions[i]],misR[Canonical_partitions[i]],sign);
+			junctions[i].Mismatches = misL[Canonical_partitions[i]] + misR[Canonical_partitions[i]];
+			char signal[5];
+			signal[4] = 0;
+			Get_Bases_ASCII(junctions[i].p,2,signal);
+			Get_Bases_ASCII(junctions[i].q-1,2,signal+2);
+			strcpy(junctions[i].signal, signal);
+			if(junctions[i].isCanonical())
+				Can_Junctions=true;
+		}
+		junctions[Canonical_parcount].p = UINT_MAX;
+	}
 
 	return junctions;
 }

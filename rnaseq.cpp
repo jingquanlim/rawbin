@@ -206,11 +206,11 @@ int main(int argc, char* argv[])
 
 			if(Compiled_Junctions_Ptr && !(DEBUG && Err))
 			{
-				printf("compiled_junction_ptr: %d\n", Compiled_Junctions_Ptr);
+				//printf("compiled_junction_ptr: %d\n", Compiled_Junctions_Ptr);
 				int firstSignal = -2;
 				int tempType = Classify_Hits(Compiled_Junctions,firstSignal);
 				int approvedPtr;
-				printf("%s\n",Head.Description);
+				//printf("%s\n",Head.Description);
 				//if(strcmp(Head.Description+1,"seq.1406a")==0 || strcmp(Head.Description+1,"seq.1532b")==0)
 					approvedPtr = getBest(Compiled_Junctions, selectedJunctions, true);
 				//else
@@ -333,7 +333,7 @@ int Classify_Hits(Junction * Final_Juncs, int & firstSignal){
 			}
 		}
 	}
-	printf("Classify count: %d\n", count);
+	//printf("Classify count: %d\n", count);
 	if(count == 1 && signalCount == 1)
 		return UNIQUE_SIGNAL;
 	else if(count == 1)
@@ -363,10 +363,10 @@ int getBest(Junction * Final_Juncs, int * approved, bool print) {
 			approved[ptr] = i;
 			++ptr;
 		}	
-			if(print)
-				printf("%f\t%u\t%u\t%u\n",Final_Juncs[i].score,Final_Juncs[i].p, Final_Juncs[i].q, Final_Juncs[i].r);
+			//if(print)
+				//printf("%f\t%u\t%u\t%u\n",Final_Juncs[i].score,Final_Juncs[i].p, Final_Juncs[i].q, Final_Juncs[i].r);
 	}
-	printf("Total reported: %d\n",count);
+	//printf("Total reported: %d\n",count);
 	return ptr;
 }
 
@@ -560,10 +560,10 @@ int Find_Pairings(int & Pairs_Index,SARange* MF_Pre_Hits,SARange* MF_Suf_Hits,PA
 						Final_Juncs[Final_Juncs_Ptr++]=junctions[i];
 					}
 				}
-				printf("copy count: %d\n", copyCount);
+				//printf("copy count: %d\n", copyCount);
 			}
 		}
-		printf("Final_Junc_Ptr: %d\n",Final_Juncs_Ptr);
+		//printf("Final_Junc_Ptr: %d\n",Final_Juncs_Ptr);
 		delete [] junctions;
 	}
 	Label++;
@@ -772,7 +772,7 @@ void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int
 		for(int i=0;Final_Juncs[i].p!=UINT_MAX;i++)
 		{
 			unsigned p=Final_Juncs[i].p;unsigned q=Final_Juncs[i].q;int r=Final_Juncs[i].r;//assert(q>=p && r>=0);
-			printf("q-p: %d, fragment-2*minx: %d\n", int(q-p), Fragment-2*MINX);
+			//printf("q-p: %d, fragment-2*minx: %d\n", int(q-p), Fragment-2*MINX);
 			if(int(q-p)<=(Fragment-2*MINX) || q<p) continue;
 			bool Junc_Already_Found=false;
 			for(int j=0;j<Compiled_Junctions_Ptr;j++) 
