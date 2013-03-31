@@ -148,61 +148,32 @@ float getScore(unsigned p, unsigned q, unsigned x, int size, int i, int misL, in
 	return score;
 }
 
-//Assume the coordinates are 0-based.
-//All intervals used are closed interval.
-Junction* extend(char* R, unsigned x, unsigned y, unsigned p, unsigned q, char sign){
-	assert(p+x < q);
-	
-	//To allow some over extension into the anchors
-	x -= 5;
-	y += 5;
-	q += 5;
-
-
-	unsigned size = y-x-1;
-	//printf("size: %u\n",size);
-	int misL[size+1], misR[size+1];
-	char basesL[size+1], basesR[size+1];
-	basesL[size] = 0;
-	basesR[size] = 0;
-	//char str1[602];
-	//str1[600]=0;
-	//
-	
-	//printf("x: %u, y: %u, p: %u, q: %u\n",x,y,p,q);
-
-	Get_Bases_ASCII(p+x+1, size, basesL);
-	Get_Bases_ASCII(q-size, size, basesR);
-	//Get_Bases_ASCII(0, 600, str1);
-	//printf("size: %d, %d, %s\n",size,q-size, str1);
-	//printf("%s\n",R);
-	//printf("%c\t%d\t%s\n",basesL[0],strlen(basesL),basesL);
-	//printf("%c\t%d\t%s\n",basesR[0],strlen(basesR),basesR);
-	int countL=0, countR=0;
-	misL[0] = misR[size] = 0;
-	for(int i=1; i<size+1; i++)
+//Given partitions indicating tentative junctions, fills the junction data structure with  relrvent information..
+bool Fill_Junctions(Junction* junctions,const int parCount,int* partitions,const unsigned p,const unsigned q,const unsigned x,const unsigned size,int* misL,int * misR,char sign)
+{
+	bool Can_Junctions=false;
+	for(int i = 0; i<parCount; i++)
 	{
-		if(R[x+i] != basesL[i-1])
-			++countL;
-		if(R[x+size+1-i] != basesR[size-i])
-			++countR;
-		//printf("%c\t%c\n",R[x+i], basesL[i-1]);
-		misL[i] = countL;
-		misR[size-i] = countR;
-		//printf("misL: %d, %d\n",i,misL[i]);
-		//printf("misR: %d, %d\n",i,misR[size-i]);
+		junctions[i].p = p + x + partitions[i] + 1;
+		junctions[i].q = q - size + partitions[i] - 1;
+		junctions[i].r = x + partitions[i] + 1;
+		junctions[i].score = getScore(p,q,x,size,partitions[i],misL[partitions[i]],misR[partitions[i]],sign);
+		junctions[i].Mismatches = misL[partitions[i]] + misR[partitions[i]];
+		char signal[5];
+		signal[4] = 0;
+		Get_Bases_ASCII(junctions[i].p,2,signal);
+		Get_Bases_ASCII(junctions[i].q-1,2,signal+2);
+		strcpy(junctions[i].signal, signal);
+		if(junctions[i].isCanonical())
+			Can_Junctions=true;
 	}
+	return Can_Junctions;
+}
 
-	//Find the partitions that give the minimum mismatches.
-	//Partitions store the size of the portion of the left extension.
-	int min= misL[0] + misR[0],Sig_Score=0;
-	int Can_min= misL[0] + misR[0];
-	int parCount = 0,Canonical_parcount=0;
-	int partitions[size+1];
-	int Canonical_partitions[size+1];
-	partitions[0] = 0;Canonical_partitions[0] = 0;
-
-
+//Search for possible junctions.
+//searches for possible cannonical as well as least mismatch junctions..
+void Find_Partitions(unsigned size,int* misR,int* misL,char* basesL,char* basesR,int* partitions,int* Canonical_partitions,int & parCount,int & Canonical_parcount,int & min,int & Can_min,int & Sig_Score) 
+{
 	for(int i=1; i<size+1; i++)
 	{
 		int temp = misL[i]+misR[i];
@@ -226,53 +197,64 @@ Junction* extend(char* R, unsigned x, unsigned y, unsigned p, unsigned q, char s
 			}
 		}
 
-		if(DEBUG)
+		if(temp == min)
 		{
-			if(temp<=MIS_DENSITY)
-			{
-				partitions[parCount] = i;
-				++parCount;
-			}
-			min=std::min(temp,min);
+			partitions[parCount] = i;
+			++parCount;
 		}
-		else
+		else if(temp < min) //(temp>max)
 		{
-			
-			if(temp == min)//(fabs(temp-max) < 0.00000001)//(temp == min)
-			{
-				partitions[parCount] = i;
-				++parCount;
-			}
-			else if(temp < min) //(temp>max)
-			{
-				parCount = 1;
-				min = temp;
-				//max = temp;
-				partitions[0] = i;
-			}
+			parCount = 1;
+			min = temp;
+			partitions[0] = i;
 		}
 	}
-	//printf("Parcount: %d\t%f\n", parCount, max);
+}
+
+//Assume the coordinates are 0-based.
+//All intervals used are closed interval.
+Junction* extend(char* R, unsigned x, unsigned y, unsigned p, unsigned q, char sign){
+	assert(p+x < q);
+	
+	//To allow some over extension into the anchors
+	x -= 5;
+	y += 5;
+	q += 5;
+
+
+	unsigned size = y-x-1;
+	int misL[size+1], misR[size+1];
+	char basesL[size+1], basesR[size+1];
+	basesL[size] = 0;
+	basesR[size] = 0;
+
+	Get_Bases_ASCII(p+x+1, size, basesL);
+	Get_Bases_ASCII(q-size, size, basesR);
+	int countL=0, countR=0;
+	misL[0] = misR[size] = 0;
+	for(int i=1; i<size+1; i++)
+	{
+		if(R[x+i] != basesL[i-1])
+			++countL;
+		if(R[x+size+1-i] != basesR[size-i])
+			++countR;
+		misL[i] = countL;
+		misR[size-i] = countR;
+	}
+
+	//Find the partitions that give the minimum mismatches.
+	//Partitions store the size of the portion of the left extension.
+	int min= misL[0] + misR[0],Sig_Score=0;
+	int Can_min= misL[0] + misR[0];
+	int parCount = 0,Canonical_parcount=0;
+	int partitions[size+1];
+	int Canonical_partitions[size+1];
+	partitions[0] = 0;Canonical_partitions[0] = 0;
+	Find_Partitions(size,misR,misL,basesL,basesR,partitions,Canonical_partitions,parCount,Canonical_parcount,min,Can_min,Sig_Score); 
 	
 	//Find the junctions based on the partitions obtained
-	//assert(min>=0 && min<=MINX+1);
 	Junction *junctions = new Junction[parCount+1];
-	bool Can_Junctions=false;
-	for(int i = 0; i<parCount; i++)
-	{
-		junctions[i].p = p + x + partitions[i] + 1;
-		junctions[i].q = q - size + partitions[i] - 1;
-		junctions[i].r = x + partitions[i] + 1;
-		junctions[i].score = getScore(p,q,x,size,partitions[i],misL[partitions[i]],misR[partitions[i]],sign);
-		junctions[i].Mismatches = misL[partitions[i]] + misR[partitions[i]];
-		char signal[5];
-		signal[4] = 0;
-		Get_Bases_ASCII(junctions[i].p,2,signal);
-		Get_Bases_ASCII(junctions[i].q-1,2,signal+2);
-		strcpy(junctions[i].signal, signal);
-		if(junctions[i].isCanonical())
-			Can_Junctions=true;
-	}
+	bool Can_Junctions=Fill_Junctions(junctions,parCount,partitions,p,q,x,size,misL,misR,sign);
 	junctions[parCount].p = UINT_MAX;
 	
 	if(!Can_Junctions && Canonical_parcount && Can_min-1<=min)
@@ -282,21 +264,7 @@ Junction* extend(char* R, unsigned x, unsigned y, unsigned p, unsigned q, char s
 			delete [] junctions;
 			junctions = new Junction[Canonical_parcount+1];
 		}
-		for(int i = 0; i<Canonical_parcount; i++)
-		{
-			junctions[i].p = p + x + Canonical_partitions[i] + 1;
-			junctions[i].q = q - size + Canonical_partitions[i] - 1;
-			junctions[i].r = x + Canonical_partitions[i] + 1;
-			junctions[i].score = getScore(p,q,x,size,Canonical_partitions[i],misL[Canonical_partitions[i]],misR[Canonical_partitions[i]],sign);
-			junctions[i].Mismatches = misL[Canonical_partitions[i]] + misR[Canonical_partitions[i]];
-			char signal[5];
-			signal[4] = 0;
-			Get_Bases_ASCII(junctions[i].p,2,signal);
-			Get_Bases_ASCII(junctions[i].q-1,2,signal+2);
-			strcpy(junctions[i].signal, signal);
-			if(junctions[i].isCanonical())
-				Can_Junctions=true;
-		}
+		Fill_Junctions(junctions,Canonical_parcount,Canonical_partitions,p,q,x,size,misL,misR,sign);
 		junctions[Canonical_parcount].p = UINT_MAX;
 	}
 
