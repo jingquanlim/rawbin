@@ -127,7 +127,7 @@ inline void Convert_Reverse(char* Read,char * RC_Read,char* RC_Bin,int StringLen
 void Print_SAM_Header(std::map <unsigned, Ann_Info> Annotations,int argc,char* argv[],char* Input_File);
 void Init_Prob();
 void fillProbArray(float prob[16][64][2], string filename);
-int getBest(Junction * Compiled_Junctions, int * approved, bool print);
+int getBest(char* Current_Tag,int StringLength,Junction * Compiled_Junctions, int * approved, bool print);
 //}-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 
 int main(int argc, char* argv[])
@@ -206,25 +206,10 @@ int main(int argc, char* argv[])
 
 			if(Compiled_Junctions_Ptr && !(DEBUG && Err))
 			{
-				//printf("compiled_junction_ptr: %d\n", Compiled_Junctions_Ptr);
 				int firstSignal = -2;
 				int tempType = Classify_Hits(Compiled_Junctions,firstSignal);
 				int approvedPtr;
-				//printf("%s\n",Head.Description);
-				//if(strcmp(Head.Description+1,"seq.1406a")==0 || strcmp(Head.Description+1,"seq.1532b")==0)
-					approvedPtr = getBest(Compiled_Junctions, selectedJunctions, true);
-				//else
-				//	approvedPtr = getBest(Compiled_Junctions, selectedJunctions, false);
-				//if(tempType == NON_UNIQUE_SIGNAL)
-				//	Print_Hits(Head,Compiled_Junctions,OUT,SAM[tempType],Tag_Count,firstSignal,tempType);//tempType);
-				//else{
-				/*	
-					for(int i=0;Compiled_Junctions[i].p!=UINT_MAX;i++)	
-					{
-						Print_Hits(Head,Compiled_Junctions,OUT,SAM[tempType],Tag_Count,i,tempType);//tempType);
-					}
-				*/
-				//}
+				approvedPtr = getBest(Head.Tag,File_Info.STRINGLENGTH,Compiled_Junctions, selectedJunctions, true);
 				
 				if(approvedPtr > 1) {
 					for(int i=0; i<approvedPtr; i++) {
@@ -344,10 +329,42 @@ int Classify_Hits(Junction * Final_Juncs, int & firstSignal){
 		return NON_UNIQUE_OTHERS;
 }
 
-int getBest(Junction * Final_Juncs, int * approved, bool print) {
+int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * approved, bool print) {
 	float max = -100000;
 	int ptr = 0;
 	int count = 0;
+	char RC_Read[MAXDES],RC_Bin[MAXDES];
+	char Cat[MAXDES];
+	Convert_Reverse(Current_Tag,RC_Read,RC_Bin,StringLength);
+
+//Calculate true mismatches..
+	for(int i =0; Final_Juncs[i].p != UINT_MAX; i++) 
+	{
+		if(Final_Juncs[i].q)
+		{
+			Get_Bases_ASCII(Final_Juncs[i].p-Final_Juncs[i].r, Final_Juncs[i].r, Cat);
+			Get_Bases_ASCII(Final_Juncs[i].q+1, StringLength-Final_Juncs[i].r, Cat+Final_Juncs[i].r);
+		}
+		else
+		{
+			Get_Bases_ASCII(Final_Juncs[i].p, StringLength,Cat);
+		}
+
+		char* Read;
+		Final_Juncs[i].Mismatches=0;
+		if(Final_Juncs[i].Sign)
+			Read=Current_Tag;
+		else
+			Read=RC_Bin;
+
+		for(int j=0;j<StringLength;j++)
+		{
+			if(Cat[j]!="ACGT"[Read[j]]) 
+				Final_Juncs[i].Mismatches++;
+			Cat[j]=0;
+		}
+	}
+
 	for(int i =0; Final_Juncs[i].p != UINT_MAX; i++) {
 		count ++;
 		if(!Final_Juncs[i].q)

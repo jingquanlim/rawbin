@@ -12,8 +12,9 @@ extern const int MINX;//Minimum extension..
 extern float Donor_Prob[16][64][2];
 extern float Acc_Prob[16][64][2];
 
-bool Junction::isCanonical(){
-	return !(strcmp(signal, "GTAG") && strcmp(signal, "GCAG") && strcmp(signal, "ATAC") && strcmp(signal, "CTAC") && strcmp(signal, "CTGC") && strcmp(signal, "GTAT"));
+int Junction::isCanonical(){
+	//return !(strcmp(signal, "GTAG") && strcmp(signal, "GCAG") && strcmp(signal, "ATAC") && strcmp(signal, "CTAC") && strcmp(signal, "CTGC") && strcmp(signal, "GTAT"));
+	return Canonical_Score(signal);
 }
 
 int Canonical_Score(char* signal)

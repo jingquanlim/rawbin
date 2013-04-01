@@ -14,13 +14,14 @@ struct Junction {
 	char *Chrom;
 	int Mismatches;
 	char signal[5];
-	bool isCanonical();
+	int isCanonical();
 	int Label;
 	int ID;
 	char Sign;
 	float score;
 };
 extern unsigned char* Original_Text;
+int Canonical_Score(char* signal);
 Junction* extend(char* R, unsigned x, unsigned y, unsigned p, unsigned q, char sign);
 void loadPac(char* filename);
 void Get_Bases_ASCII (unsigned Location,int StringLength,char* Org_String);
