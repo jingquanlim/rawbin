@@ -1,0 +1,18 @@
+#!/usr/bin/perl
+
+$Last_Des="";
+while($L=<STDIN>)
+{
+	chomp $L;
+	split(/\t/,$L);
+	$Des=$_[0];
+	if($Des eq $Last_Des)
+	{
+		if(substr($L,0,1) ne '@')
+		{
+			print "$L\n";
+		}
+	}
+#print "$Des\t$Last_Des\n";
+	$Last_Des=$Des;
+}

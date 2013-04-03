@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+#extract reads from a sam that spans a junction
+open IN,$ARGV[0] or die;
+@Des=split(":",$ARGV[1]);
+$ChrO=$Des[0];$LocO=$Des[1];$CigO=$Des[2];
+@Cigar=split(/M|N/,$CigO);
+$SkipO=$Cigar[0];
+$GapO=$Cigar[1];
+$LocO+=$SkipO;
+
+$Count=0;$Match=0;
+while($L=<IN>)
+{
+	chomp $L;
+	if(substr($L,0,1) ne '@')
+	{
+		@Field=split(/\t/,$L);
+		@Des=split(":",$Field[0]);
+		$Chr=$Field[2];$Loc=$Field[3];$Cig=$Field[5];$Mapped=$Field[1];
+		@Cigar=split(/M|N/,$Cig);
+		$Skip=$Cigar[0];
+		$Gap=$Cigar[1];
+		$Loc+=$Skip;
+		if($Mapped != 4)
+		{
+			if(($ChrO eq $Chr) && ($LocO eq $Loc) && ($Gap eq $GapO))
+			{
+				print "$L\n";
+			}
+		}
+	}
+}
+#seq.2129a:chr6:124677793:21M316N55M:124677793-124677813,124678130-124678184:+   0       chr6    124677793       60      21M316N55M

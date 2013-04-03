@@ -1,0 +1,36 @@
+#!/usr/bin/perl
+#verify simulated reads mapping.
+#>seq.3a:chr5:137853291:31M2075N19M:137853291-137853321,137855397-137855415:-
+open IN,$ARGV[0] or die;
+open GOOD,">$ARGV[0].match" or die;
+open BAD,">$ARGV[0].bad" or die;
+$Count=0;$Match=0;
+while($L=<IN>)
+{
+	if(substr($L,0,1) ne '@')
+	{
+		@Field=split(/\t/,$L);
+		@Des=split(":",$Field[0]);
+		$ChrO=$Des[1];$LocO=$Des[2];$CigO=$Des[3];
+#print "$ChrO-$LocO-$CigO\n";
+		$Chr=$Field[2];$Loc=$Field[3];$Cig=$Field[5];$Mapped=$Field[1];
+#	print "$Chr-$Loc-$Cig\n";
+		if($Mapped != 4)
+		{
+			if(($ChrO eq $Chr) && ($LocO eq $Loc) && ($CigO eq $Cig))
+			{
+				print GOOD $L;
+			}
+			else
+			{
+				print BAD $L;
+			}
+		}
+#else
+#		{
+#			print $L;
+#		}
+
+	}
+}
+#seq.2129a:chr6:124677793:21M316N55M:124677793-124677813,124678130-124678184:+   0       chr6    124677793       60      21M316N55M

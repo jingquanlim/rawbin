@@ -1,0 +1,7 @@
+cat header.sam \
+nonunique_onesignal.sam \
+others.sam \
+unique_nosignal.sam \
+unique_signal.sam >analysis/final.sam
+
+#rejected.sam \
