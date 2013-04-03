@@ -128,6 +128,7 @@ void Print_SAM_Header(std::map <unsigned, Ann_Info> Annotations,int argc,char* a
 void Init_Prob();
 void fillProbArray(float prob[16][64][2], string filename);
 int getBest(char* Current_Tag,int StringLength,Junction * Compiled_Junctions, int * approved, bool print);
+
 //}-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 
 int main(int argc, char* argv[])
@@ -136,6 +137,7 @@ int main(int argc, char* argv[])
 	time_t Start_Time,End_Time;
 	unsigned Number_of_Tags=1000;
 	unsigned Progress=0;
+	unsigned Hit_ID=0;
 	FILE* OUT;
 
 //------------------- INIT -------------------------------------------------------------
@@ -211,14 +213,18 @@ int main(int argc, char* argv[])
 				int approvedPtr;
 				approvedPtr = getBest(Head.Tag,File_Info.STRINGLENGTH,Compiled_Junctions, selectedJunctions, true);
 				
-				if(approvedPtr > 1) {
-					for(int i=0; i<approvedPtr; i++) {
-						Print_Hits(Head,Compiled_Junctions,OUT,rejectedSAM,Tag_Count,selectedJunctions[i],tempType);//tempType);
+				if(approvedPtr > 1) 
+				{
+					Hit_ID++;
+					for(int i=0; i<approvedPtr; i++) 
+					{
+						Print_Hits(Head,Compiled_Junctions,OUT,rejectedSAM,Tag_Count,selectedJunctions[i],tempType,Hit_ID);//tempType);
 					}
 				}	
-				else {
+				else 
+				{
 					for(int i=0; i<approvedPtr; i++) {
-						Print_Hits(Head,Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType);//tempType);
+						Print_Hits(Head,Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType,0);//tempType);
 					}
 				}
 
@@ -335,6 +341,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 	int count = 0;
 	char RC_Read[MAXDES],RC_Bin[MAXDES];
 	char Cat[MAXDES];
+	int Mismatch_Pos[MAXDES];
 	Convert_Reverse(Current_Tag,RC_Read,RC_Bin,StringLength);
 
 //Calculate true mismatches..
@@ -357,33 +364,59 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 		else
 			Read=RC_Bin;
 
+		int Pos=0;
 		for(int j=0;j<StringLength;j++)
 		{
 			if(Cat[j]!="ACGT"[Read[j]]) 
+			{
 				Final_Juncs[i].Mismatches++;
+				Mismatch_Pos[Pos++]=j;
+			}
 			Cat[j]=0;
 		}
+
+		Final_Juncs[i].score= 0;
+		if(Final_Juncs[i].r>(StringLength-Final_Juncs[i].r))//large part is in first anchor..
+		{
+			if(Mismatch_Pos[0]>Final_Juncs[i].r)
+			{
+				Final_Juncs[i].score= -1;
+			}
+		}
+		else
+		{
+			if(Mismatch_Pos[0]<Final_Juncs[i].r)
+			{
+				Final_Juncs[i].score= -1;
+			}
+		}
+		Final_Juncs[i].score= Mismatch_Pos[0];
 	}
 
-	for(int i =0; Final_Juncs[i].p != UINT_MAX; i++) {
-		count ++;
-		if(!Final_Juncs[i].q)
-			Final_Juncs[i].score = 5;
-		float tempScore = Final_Juncs[i].score - Final_Juncs[i].Mismatches;
-		if(fabs(tempScore - max) < 0.0000001) {
+	for(int i =0; Final_Juncs[i].p != UINT_MAX; i++) 
+	{
+		int Junc_Score=Final_Juncs[i].isCanonical();
+		if(!Final_Juncs[i].q) Junc_Score=4;
+		else
+		{
+			assert(Final_Juncs[i].q>Final_Juncs[i].p);
+			int dist=Final_Juncs[i].q-Final_Juncs[i].p;
+			if(dist>30000) Junc_Score+=1;
+			else if(dist>5000) Junc_Score+=2;
+			else if(dist>2000) Junc_Score+=3;
+			else if(dist>=100) Junc_Score+=4;
+			else if(dist>60) Junc_Score+=1;
+		}
+		int tempScore = -3*Final_Juncs[i].Mismatches+Junc_Score;//+Final_Juncs[i].score;
+		if(tempScore >= max)
+		{
+			if(tempScore!=max) ptr = 0;
+			max = tempScore;
 			approved[ptr] = i;
 			++ptr;
 		}
-		else if(tempScore > max) {
-			max = tempScore;
-			ptr = 0;
-			approved[ptr] = i;
-			++ptr;
-		}	
-			//if(print)
-				//printf("%f\t%u\t%u\t%u\n",Final_Juncs[i].score,Final_Juncs[i].p, Final_Juncs[i].q, Final_Juncs[i].r);
+
 	}
-	//printf("Total reported: %d\n",count);
 	return ptr;
 }
 

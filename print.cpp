@@ -27,11 +27,12 @@ inline char* Nullify_String(char* S)
 	return Strend;
 }
 
-void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int Tag_Count, int firstSignal,int Junc_Type)
+void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int Tag_Count, int firstSignal,int Junc_Type,unsigned Hit_ID)
 {
 	//fprintf(OUT,"%s",Head.Description);  
 	Nullify_String(Head.Description+1);
 	Nullify_String(Head.Tag_Copy);
+	assert(Hit_ID!=INT_MAX);//Hope there arent gazillion reads..
 	
 	int i=firstSignal;
 	//for(int i=(firstSignal>=0?firstSignal:0);Final_Juncs[i].p!=INT_MAX && i!=firstSignal+1;i++)
