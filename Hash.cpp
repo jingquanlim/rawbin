@@ -1,25 +1,52 @@
 #include "Hash.h"
+#include "limits.h"
 #include "assert.h"
+#include <iostream>
 
 map_it Hash::Begin ()
 {
 	return Junctions.begin();
 }
 
-void Hash::Insert (OP Location,int Paring)
+void Hash::Insert (OP Location,Junction & J,bool Unique)
 {
 	JStat T;
-	assert(Paring >=255 && Paring <=262); assert(Location.x <= Location.y);
+	int Paring=J.Type;
+	assert(Paring >=0 && Paring <=3); 
+	assert(Location.x <= Location.y);
 	Junc_I=Junctions.find(Location);
 	if (Junc_I == Junctions.end()) //New entry..
 	{
 		T.Count=1;T.Junc_Type=Paring;
+		for(int i=0;i<ENT_LIM-15;i++)
+		{
+			T.L_Anchor[i]=0;
+			T.R_Anchor[i]=0;
+		}
+		if (Unique)
+			T.Unique=true;
+		else
+			T.Unique=false;
 		Junctions[Location]=T;
 	}
 	else 
 	{
+		assert(J.L>=0 && J.R>=0);
 		assert((Junc_I->second).Count>0 && (Junc_I->second).Junc_Type==Paring);
 		(Junc_I->second).Count++;
+		if(J.L>=ENT_LIM)
+		{
+			if ((Junc_I->second).L_Anchor[ENT_LIM-1]!=CHAR_MAX) (Junc_I->second).L_Anchor[ENT_LIM-1]++;
+		}
+		else if ((Junc_I->second).L_Anchor[J.L]!=CHAR_MAX) (Junc_I->second).L_Anchor[ENT_LIM-1]++;
+
+		if(J.L>=ENT_LIM)
+		{
+			if ((Junc_I->second).R_Anchor[ENT_LIM-1]!=CHAR_MAX) (Junc_I->second).R_Anchor[ENT_LIM-1]++;
+		}
+		else if ((Junc_I->second).R_Anchor[J.L]!=CHAR_MAX) (Junc_I->second).R_Anchor[ENT_LIM-1]++;
+		if (Unique)
+			(Junc_I->second).Unique=true;
 	}
 }
 

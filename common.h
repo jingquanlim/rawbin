@@ -2,6 +2,7 @@
 #define COMMON_H
 #include "const.h"
 #define SOLEXA_READS 0
+#define ENT_LIM 50 
 #define SOLID_READS  1
 #define SINGLE_END 1
 #define PAIRED_END 2
@@ -31,7 +32,6 @@ extern "C"
 }
 
 //{-----------------------------  STRUCTS  -------------------------------------------------/
-
 struct Ann_Info
 {
 	unsigned Size;
@@ -551,7 +551,6 @@ struct MEM
 	SARange* Possible_02C;
 
 };
-
 
 
 struct Thread_Arg

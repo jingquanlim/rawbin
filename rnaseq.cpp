@@ -98,6 +98,8 @@ SA* SA_Index;
 char COMPRESS;
 int *SA_Blocks;
 int Max_Junc_Found;
+int Transcript_Number;
+int Max_Junc_Count;
 int Least_Mis_In_Junc;
 MEMX Generic_Hits;
 
@@ -128,7 +130,6 @@ void Print_SAM_Header(std::map <unsigned, Ann_Info> Annotations,int argc,char* a
 void Init_Prob();
 void fillProbArray(float prob[16][64][2], string filename);
 int getBest(char* Current_Tag,int StringLength,Junction * Compiled_Junctions, int * approved, bool print);
-
 //}-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 
 int main(int argc, char* argv[])
@@ -203,6 +204,8 @@ int main(int argc, char* argv[])
 			Max_Junc_Found=INT_MAX;
 			Least_Mis_In_Junc=INT_MAX;
 			Compiled_Junctions_Ptr=0;
+			Transcript_Number=0;
+			Max_Junc_Count=0;
 			int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf);
 			Compiled_Junctions[Compiled_Junctions_Ptr].p=UINT_MAX;
 
@@ -317,7 +320,8 @@ int Classify_Hits(Junction * Final_Juncs, int & firstSignal){
 		count++;
 		if(Final_Juncs[i].q!=Final_Juncs[i].p-1)//not an exact match?
 		{
-			if(Final_Juncs[i].isCanonical()) {
+			Final_Juncs[i].Type=Final_Juncs[i].isCanonical();
+			if(Final_Juncs[i].Type) {
 				signalCount++;
 				if(firstSignal < 0)
 					firstSignal = i;
@@ -345,12 +349,18 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 	Convert_Reverse(Current_Tag,RC_Read,RC_Bin,StringLength);
 
 //Calculate true mismatches..
-	for(int i =0; Final_Juncs[i].p != UINT_MAX; i++) 
+	int Junc_Count=Final_Juncs[0].Junc_Count;
+	for(int i =0; Final_Juncs[i].p != UINT_MAX;i+=(Junc_Count ? Junc_Count:1),\
+						   Junc_Count=Final_Juncs[i].Junc_Count) 
 	{
 		if(Final_Juncs[i].q)
 		{
-			Get_Bases_ASCII(Final_Juncs[i].p-Final_Juncs[i].r, Final_Juncs[i].r, Cat);
-			Get_Bases_ASCII(Final_Juncs[i].q+1, StringLength-Final_Juncs[i].r, Cat+Final_Juncs[i].r);
+			int Last=0;
+			for(int j=0;j<Junc_Count;j++)
+			{
+				Get_Bases_ASCII(Final_Juncs[i+j].p-(Final_Juncs[i+j].r-Last), (Final_Juncs[i+j].r-Last), Cat+Last);
+			}
+			Get_Bases_ASCII(Final_Juncs[i+Junc_Count-1].q+1, StringLength-Final_Juncs[i+Junc_Count-1].r, Cat+Final_Juncs[i+Junc_Count-1].r);
 		}
 		else
 		{
@@ -395,7 +405,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 
 	for(int i =0; Final_Juncs[i].p != UINT_MAX; i++) 
 	{
-		int Junc_Score=Final_Juncs[i].isCanonical();
+		int Junc_Score=Final_Juncs[i].Type;
 		if(!Final_Juncs[i].q) Junc_Score=4;
 		else
 		{
@@ -408,7 +418,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 			else if(dist>60) Junc_Score+=1;
 		}
 		int tempScore = -3*Final_Juncs[i].Mismatches+Junc_Score;//+Final_Juncs[i].score;
-		if(tempScore >= max)
+		if(Final_Juncs[i].Junc_Count<=1 && tempScore >= max)
 		{
 			if(tempScore!=max) ptr = 0;
 			max = tempScore;
@@ -695,8 +705,8 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 		{
 			if(!Junc_Count)//Match..
 			{
-				Junction J;J.Sign=(Sign)? 1:0;J.Mismatches=R.Mismatches;
-				if (Last_Exon!=UINT_MAX) 
+				Junction J;J.Sign=(Sign)? 1:0;J.Mismatches=R.Mismatches;J.Junc_Count=0;
+				if (Last_Exon!=UINT_MAX)//one hit.. 
 				{
 					J.p=Last_Exon;
 					J.r=J.q=0;
@@ -709,7 +719,7 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 						Err=1;
 					}
 				}
-				else
+				else//Many hits..
 				{
 					for(unsigned i=R.Start;i<=R.End;i++)
 					{
@@ -729,11 +739,14 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 			}
 
 			if(Least_Mis_In_Junc> Mis_In_Junc_Count) Least_Mis_In_Junc=Mis_In_Junc_Count; 
+			Transcript_Number++;
+			if(Max_Junc_Count<Junc_Count)//count max transcribed juncs..
+				Max_Junc_Count=Junc_Count;
 			for(int i=0;i<Junc_Count;i++)
 			{
 				if(Compiled_Junctions_Ptr< MAX_JUNCS_ALLOWED)
 				{
-					Trans_Array[i].Sign=(Sign)? 1:0;Trans_Array[i].Mismatches=R.Mismatches;Compiled_Junctions[Compiled_Junctions_Ptr++]=Trans_Array[i];
+					Trans_Array[i].Junc_Count=Junc_Count;Trans_Array[i].Label=Transcript_Number;Trans_Array[i].Sign=(Sign)? 1:0;Trans_Array[i].Mismatches=R.Mismatches;Compiled_Junctions[Compiled_Junctions_Ptr++]=Trans_Array[i];
 				}
 				else
 				{
@@ -749,7 +762,7 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 			{
 				if(Compiled_Junctions_Ptr< MAX_JUNCS_ALLOWED)
 				{
-					Trans_Array[i].Sign=(Sign)? 1:0;Trans_Array[i].Mismatches=R.Mismatches;Compiled_Junctions[Compiled_Junctions_Ptr++]=Trans_Array[i];
+					Trans_Array[i].Junc_Count=Junc_Count;Trans_Array[i].Label=Transcript_Number;Trans_Array[i].Sign=(Sign)? 1:0;Trans_Array[i].Mismatches=R.Mismatches;Compiled_Junctions[Compiled_Junctions_Ptr++]=Trans_Array[i];
 				}
 				else
 				{

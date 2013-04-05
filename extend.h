@@ -7,19 +7,6 @@
 #include <string.h>
 #include <math.h>
 
-struct Junction {
-	unsigned p;
-	unsigned q;
-	unsigned r;
-	char *Chrom;
-	int Mismatches;
-	char signal[5];
-	int isCanonical();
-	int Label;
-	int ID;
-	char Sign;
-	float score;
-};
 extern unsigned char* Original_Text;
 int Canonical_Score(char* signal);
 Junction* extend(char* R, unsigned x, unsigned y, unsigned p, unsigned q, char sign);

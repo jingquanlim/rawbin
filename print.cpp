@@ -35,56 +35,48 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 	assert(Hit_ID!=INT_MAX);//Hope there arent gazillion reads..
 	
 	int i=firstSignal;
-	//for(int i=(firstSignal>=0?firstSignal:0);Final_Juncs[i].p!=INT_MAX && i!=firstSignal+1;i++)
+	if(Final_Juncs[i].q)
 	{
-		//fprintf(OUT,"%s\t%d\t%d\t%d\t%d\n",Final_Juncs[i].Chrom,Final_Juncs[i].p,Final_Juncs[i].q,Final_Juncs[i].Mismatches,Tag_Count);
+		OP Pair;
 
-		//if (Junc_Type==UNIQUE_NOSIGNAL || Junc_Type==UNIQUE_SIGNAL || Junc_Type==NON_UNIQUE_SIGNAL)
-		//if (Junc_Type==UNIQUE_SIGNAL)
-		if(Final_Juncs[i].q)
-		{
-			OP Pair;
+		Ann_Info A;
+		Location_To_Genome(Final_Juncs[i].p,A);
+		Location_To_Genome(Final_Juncs[i].q,A);
 
-			Ann_Info A;
-			Location_To_Genome(Final_Juncs[i].p,A);
-			Location_To_Genome(Final_Juncs[i].q,A);
+		Pair.x=Final_Juncs[i].p;
+		Pair.y=Final_Juncs[i].q;
+		Final_Juncs[i].L=Final_Juncs[i].r;
+		Final_Juncs[i].R=READLEN-Final_Juncs[i].r;
+		assert(Genome_Offsets[Final_Juncs[i].ID].Offset !=INT_MAX);
+		Genome_Offsets[Final_Juncs[i].ID].Junc_Hash->Insert(Pair,Final_Juncs[i],Hit_ID? false:true);
 
-			Pair.x=Final_Juncs[i].p;
-			Pair.y=Final_Juncs[i].q;
-			assert(Genome_Offsets[Final_Juncs[i].ID].Offset !=INT_MAX);
-			Genome_Offsets[Final_Juncs[i].ID].Junc_Hash->Insert(Pair,255);
+		SAM << Head.Description+1 <<"\t"
+			<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  /*Flag*/
+			<< Final_Juncs[i].Chrom <<"\t" 
+			<< Final_Juncs[i].p-Final_Juncs[i].r+1 << "\t" 
+			<< 60 <<"\t" 
+			<< Final_Juncs[i].r << "M" << Final_Juncs[i].q-Final_Juncs[i].p+1<< "N" << READLEN-Final_Juncs[i].r <<"M\t" 
+			<< "*\t0\t0\t" 
+			<< Head.Tag_Copy << "\t" 
+			<< "*\t"
+			<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" << "NH:f:" << Final_Juncs[i].score <<endl;
+	}
+	else
+	{
+		assert(Final_Juncs[i].r==0);
+		Ann_Info A;
+		Location_To_Genome(Final_Juncs[i].p,A);
 
-			SAM << Head.Description+1 <<"\t"
-				<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  /*Flag*/
-				<< Final_Juncs[i].Chrom <<"\t" 
-				<< Final_Juncs[i].p-Final_Juncs[i].r+1 << "\t" 
-				<< 60 <<"\t" 
-				<< Final_Juncs[i].r << "M" << Final_Juncs[i].q-Final_Juncs[i].p+1<< "N" << READLEN-Final_Juncs[i].r <<"M\t" 
-				<< "*\t0\t0\t" 
-				<< Head.Tag_Copy << "\t" 
-				<< "*\t"
-				<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" << "NH:f:" << Final_Juncs[i].score <<endl;
-		}
-		else
-		{
-			assert(Final_Juncs[i].r==0);
-			Ann_Info A;
-			Location_To_Genome(Final_Juncs[i].p,A);
-
-			SAM << Head.Description+1 <<"\t"
-				<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  /*Flag*/
-				<< A.Name <<"\t" 
-				<< Final_Juncs[i].p << "\t" 
-				<< 60 <<"\t" 
-				<< READLEN << "M\t"  
-				<< "*\t0\t0\t" 
-				<< Head.Tag_Copy << "\t" 
-				<< "*\t"
-				<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" <<"NH:f:" << Final_Juncs[i].score <<endl;
-		}
-		//else
-		//	return;
-
+		SAM << Head.Description+1 <<"\t"
+			<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  /*Flag*/
+			<< A.Name <<"\t" 
+			<< Final_Juncs[i].p << "\t" 
+			<< 60 <<"\t" 
+			<< READLEN << "M\t"  
+			<< "*\t0\t0\t" 
+			<< Head.Tag_Copy << "\t" 
+			<< "*\t"
+			<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" <<"NH:f:" << Final_Juncs[i].score <<endl;
 	}
 }
 
@@ -151,7 +143,8 @@ void Print_Junctions(char* Junction_File)
 
 		while (Junc_Not_Empty)
 		{
-			if(JStat.Junc_Type)
+			//if(JStat.Junc_Type)
+			if(JStat.Unique)
 			{
 
 				OP H,T;
