@@ -33,6 +33,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 	Nullify_String(Head.Description+1);
 	Nullify_String(Head.Tag_Copy);
 	assert(Hit_ID!=INT_MAX);//Hope there arent gazillion reads..
+	char CIGAR[500];
 	
 	int i=firstSignal;
 	if(Final_Juncs[i].q)
@@ -50,12 +51,22 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 		assert(Genome_Offsets[Final_Juncs[i].ID].Offset !=INT_MAX);
 		Genome_Offsets[Final_Juncs[i].ID].Junc_Hash->Insert(Pair,Final_Juncs[i],Hit_ID? false:true);
 
+		char* CIGAR_ptr=CIGAR;
+		int Last=0;
+		for(int j=0;j<Final_Juncs[i].Junc_Count;j++)
+		{
+			CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM%dN",Final_Juncs[i+j].r-Last,Final_Juncs[i+j].q-Final_Juncs[i+j].p+1);
+			Last=Final_Juncs[i+j].r;
+		}
+		sprintf(CIGAR_ptr,"%dM",READLEN-Last);
+
 		SAM << Head.Description+1 <<"\t"
 			<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  /*Flag*/
 			<< Final_Juncs[i].Chrom <<"\t" 
 			<< Final_Juncs[i].p-Final_Juncs[i].r+1 << "\t" 
 			<< 60 <<"\t" 
-			<< Final_Juncs[i].r << "M" << Final_Juncs[i].q-Final_Juncs[i].p+1<< "N" << READLEN-Final_Juncs[i].r <<"M\t" 
+			<<CIGAR<<"\t"
+			//<< Final_Juncs[i].r << "M" << Final_Juncs[i].q-Final_Juncs[i].p+1<< "N" << READLEN-Final_Juncs[i].r <<"M\t" 
 			<< "*\t0\t0\t" 
 			<< Head.Tag_Copy << "\t" 
 			<< "*\t"

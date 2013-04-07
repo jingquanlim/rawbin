@@ -6,6 +6,7 @@ using namespace std;
 #include <emmintrin.h>
 #include <signal.h> 
 #include <assert.h> 
+//#include "/usr/local/include/valgrind/memcheck.h"
 //#include <dvec.h>
 #include <getopt.h>
 #include <ctype.h>
@@ -3824,6 +3825,10 @@ void Convert_To_Reverse(SARange &Tag,int StringLength,BWT *revfmi,MEMX & M)
 		c=Current_Tag[0] | (Current_Tag[1]<<2) | (Current_Tag[2]<<4) | (Current_Tag[3]<<6) | Current_Tag[4]<<8 | (Current_Tag[5]<<10);//Use lookup table...
 	}
 	Tag.Start=M.Forward_Start_LookupX[c];Tag.Level=M.Lookupsize+1;
+#ifdef DEBUG
+	SARange Range;Range.Start=M.Forward_Start_LookupX[c];Range.End=M.Forward_End_LookupX[c];//DEB
+	Range.Level=M.Lookupsize+1;//DEB
+#endif
 	Tag.Skip=0;
 	if(!Tag.Skip)
 	{
@@ -3832,6 +3837,12 @@ void Convert_To_Reverse(SARange &Tag,int StringLength,BWT *revfmi,MEMX & M)
 			New_Char=Current_Tag[1-2+Tag.Level];
 			Tag.Start = revfmi->cumulativeFreq[New_Char] + BWTOccValue(revfmi, Tag.Start, New_Char) + 1;
 			Tag.Level++;
+
+#ifdef DEBUG
+			Get_SARange_Fast(New_Char,Range,revfmi);
+			assert(Range.Start==Tag.Start);
+			assert(Range.Start);
+#endif
 		}
 		Tag.End=Tag.Start+Gap;
 	}
@@ -4371,26 +4382,6 @@ void Extend_Forwards_OneSA(const char* Current_Tag,struct SARange & Tag,int Coun
 		} 
 		else//log 2 mismatches 
 		{
-			if(5 > Count)//store only for one mismatch... later report these on a seperate stack..
-			{
-				if (!Tag.Skip) Tag.End=Tag.Start;//possibly two mismatch exists..
-				if (Tag.Level != StringLength) Tag.Level++; 
-				else //2 mismatches occuring in last position...
-				{
-					if(M.Two_Mismatches_At_End_Forward_Pointer < M.END_BOUND)
-					{
-						//if(Tag.Skip) Tag.Start=Tag.End;
-						M.Two_Mismatches_At_End_Forward[M.Two_Mismatches_At_End_Forward_Pointer]=Tag;
-						M.Two_Mismatches_At_End_Forward_Pointer++;
-					}
-					return;
-				}
-				if(M.Mismatches_Forward_Pointer < M.ARRAY_BOUND)
-				{
-					M.Mismatches_Forward[M.Mismatches_Forward_Pointer]=Tag;
-					M.Mismatches_Forward_Pointer++;
-				}
-			}
 			return;
 		}
 	}

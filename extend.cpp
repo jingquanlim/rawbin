@@ -19,6 +19,7 @@ int Junction::isCanonical(){
 
 int Canonical_Score(char* signal)
 {
+	assert(strlen(signal)==4);
 	if(!strcmp(signal, "GTAG") || !strcmp(signal, "CTAC"))
 	{
 		return 3;
@@ -134,7 +135,7 @@ float getScore(unsigned p, unsigned q, unsigned x, int size, int i, int misL, in
 	float acc_in_prob = Acc_Prob[4*acc[3]+acc[4]][16*acc[5]+4*acc[6]+acc[7]][1];
 	score += std::min(donor_ex_prob,donor_in_prob)*std::min(acc_ex_prob,acc_in_prob);
 	
-	char donorStr[9],accStr[9];
+	/*char donorStr[9],accStr[9];
 	donorStr[8] = 0;
 	accStr[8] = 0;
 	b2c(donor,donorStr,8);
@@ -143,7 +144,7 @@ float getScore(unsigned p, unsigned q, unsigned x, int size, int i, int misL, in
 	Location_To_Genome(juncStart,A);
 	Location_To_Genome(juncEnd,A1);
 	Location_To_Genome(p, A1);
-	Location_To_Genome(q, A1);
+	Location_To_Genome(q, A1);*/
 	//printf("%s\t%u\t%u\t%d\t%d\t%u\t%u\t%s\t%s\t%f\t%d\t%d\t%c\t%s\n",A.Name,p,q,size,i,juncStart, juncEnd,donorStr,accStr,score,misL,misR,sign,signal);
 
 	return score;
@@ -225,12 +226,13 @@ Junction* extend(char* R, unsigned x, unsigned y, unsigned p, unsigned q, char s
 
 	unsigned size = y-x-1;
 	int misL[size+1], misR[size+1];
-	char basesL[size+1], basesR[size+1];
+	char basesL[size+3], basesRX[size+2];
 	basesL[size] = 0;
-	basesR[size] = 0;
+	basesRX[size+1] = 0;//Need to get the extra base for motif checking..
+	char* basesR=basesRX+1;
 
-	Get_Bases_ASCII(p+x+1, size, basesL);
-	Get_Bases_ASCII(q-size, size, basesR);
+	Get_Bases_ASCII(p+x+1+2, size+2, basesL);
+	Get_Bases_ASCII(q-size-1, size+1, basesRX);
 	int countL=0, countR=0;
 	misL[0] = misR[size] = 0;
 	for(int i=1; i<size+1; i++)

@@ -558,6 +558,7 @@ int Pair_Reads(SARange *Head_Hits,SARange *Tail_Hits,PAIR *Pairs,int & Pairs_Ind
 
 	for(int i=0;Head_Hits[i].Start;i++)//Iterate Head Hits
 	{
+
 		for(int j=0;Tail_Hits[j].Start;j++)//With Tail Hits
 		{
 			Head=Head_Hits[i];

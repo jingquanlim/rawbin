@@ -200,6 +200,7 @@ int main(int argc, char* argv[])
 
 			int Label=0;
 			Actual_Tag++;
+		//	cout << Actual_Tag<<endl;
 
 			Max_Junc_Found=INT_MAX;
 			Least_Mis_In_Junc=INT_MAX;
@@ -318,7 +319,7 @@ int Classify_Hits(Junction * Final_Juncs, int & firstSignal){
 	int signalCount = 0, count = 0;
 	for(int i=0; Final_Juncs[i].p != UINT_MAX; i++){
 		count++;
-		if(Final_Juncs[i].q!=Final_Juncs[i].p-1)//not an exact match?
+		if(Final_Juncs[i].q)//!=Final_Juncs[i].p-1)//not an exact match?
 		{
 			Final_Juncs[i].Type=Final_Juncs[i].isCanonical();
 			if(Final_Juncs[i].Type) {
@@ -418,7 +419,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 			else if(dist>60) Junc_Score+=1;
 		}
 		int tempScore = -3*Final_Juncs[i].Mismatches+Junc_Score;//+Final_Juncs[i].score;
-		if(Final_Juncs[i].Junc_Count<=1 && tempScore >= max)
+		if(Final_Juncs[i].Junc_Count<=Max_Junc_Count && tempScore >= max)
 		{
 			if(tempScore!=max) ptr = 0;
 			max = tempScore;
@@ -772,9 +773,11 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 			return DUMMY_JUNC;
 		}
 	}
-
+//DEBUG
+	Generic_Hits.Hit_Array_Ptr=INT_MAX;
 	if(Align(S+Read_Skip,MINX,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip,R,Read_Skip+MINX,Read_Skip))//Can exact extension be done..
 	{
+		assert(Generic_Hits.Hit_Array_Ptr!=INT_MAX);
 		std::vector <SARange> Hits(Generic_Hits.Hit_Array_Ptr);
 		for (int i=0;i<Generic_Hits.Hit_Array_Ptr;i++)//Save hits in a vector..
 		{
@@ -857,19 +860,9 @@ void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int
 
 int Seek_Single_Strand(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf,int Sign)
 {
-	int c;
-	if(Generic_Hits.Lookupsize==3)
-	{
-		c=Current_Tag[0] | (Current_Tag[1]<<2) | (Current_Tag[2]<<4);// | (Current_Tag[3]<<6) | Current_Tag[4]<<8 | (Current_Tag[5]<<10);//Use lookup table...
-	}
-	else
-	{
-		c=Current_Tag[0] | (Current_Tag[1]<<2) | (Current_Tag[2]<<4) | (Current_Tag[3]<<6) | Current_Tag[4]<<8 | (Current_Tag[5]<<10);//Use lookup table...
-	}
-
 	SARange SA;
 	SA.Start=0;SA.End=revfmi->textLength;
-	SA.Level=1; SA.Skip=0;SA.Mismatches=0;Generic_Hits.Hit_Array_Ptr=0;Generic_Hits.Current_Tag=Current_Tag;
+	SA.Level=1; SA.Skip=0;SA.Mismatches=0;SA.Mismatch_Char=0;Generic_Hits.Hit_Array_Ptr=0;Generic_Hits.Current_Tag=Current_Tag;
 
 	int Inspected_Pairs=0;
 	int Err=0;
@@ -879,10 +872,10 @@ int Seek_Single_Strand(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & M
 
 int Seek_All_Junc(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf)
 {
-	int Err= Seek_Single_Strand(Current_Tag,StringLength,MF_Pre,MF_Suf,true/*Plus*/);
+	int Err= Seek_Single_Strand(Current_Tag,StringLength,MF_Pre,MF_Suf,1/*Plus*/);
 	char RC_Read[MAXDES],RC_Bin[MAXDES];
 	Convert_Reverse(Current_Tag,RC_Read,RC_Bin,StringLength);
-	Err+= Seek_Single_Strand(RC_Bin,StringLength,MF_Pre,MF_Suf,false/*Minus*/);
+	Err+= Seek_Single_Strand(RC_Bin,StringLength,MF_Pre,MF_Suf,0/*Minus*/);
 	return Err;
 }
 
