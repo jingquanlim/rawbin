@@ -1,0 +1,29 @@
+#!/usr/bin/perl
+#verify simulated reads mapping.
+#>seq.3a:chr5:137853291:31M2075N19M:137853291-137853321,137855397-137855415:-
+open IN,$ARGV[0] or die;
+while($L=<IN>)
+{
+	chomp $L;
+	@Des=split(":",$L);
+	$Chr=$Des[1];$Loc=$Des[2];$Cig=$Des[3];$Sign=$Des[5];
+	if(index($Chr,"random") == -1)
+	{
+		if($Sign eq '+')
+		{
+			$Flag=0;
+		}
+		else
+		{
+			$Flag=16;
+		}
+		$L2=<IN>;
+		chomp $L2;
+		print "$L\t$Flag\t$Chr\t$Loc\t60\t$Cig\t*\t0\t0\t$L2\t*\n";
+	}
+	else
+	{
+		$L2=<IN>;
+	}
+}
+#seq.2129a:chr6:124677793:21M316N55M:124677793-124677813,124678130-124678184:+   0       chr6    124677793       60      21M316N55M

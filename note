@@ -1,0 +1,7 @@
+.mar15 -debug version.`
+#convert fa file to BED
+./fa2bed ../test_data/simulated_reads_76bp_perfect.cig.1.fa.1mis.fa  >76.1.1mis.sam
+./samtobedX 76.1.1mis.sam 
+#verifying..
+python ../python/findNovelJunctions.py bam/130.1.1mis.sam.bed ../test_data/mapsplice/130bp/1junc.1mis/best_remapped_junction.bed
+
