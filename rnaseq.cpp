@@ -130,6 +130,7 @@ void Print_SAM_Header(std::map <unsigned, Ann_Info> Annotations,int argc,char* a
 void Init_Prob();
 void fillProbArray(float prob[16][64][2], string filename);
 int getBest(char* Current_Tag,int StringLength,Junction * Compiled_Junctions, int * approved, bool print);
+void Reset_MEMX(MEMX & M);
 //}-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 
 int main(int argc, char* argv[])
@@ -455,19 +456,23 @@ int Find_Single_Junc(char* Read,char* Read_Head,char* Converted_Read,MEMX & MF_P
 	int Mis_In_Head=R.Mismatches;
 	if(Anchor==UINT_MAX)//If not extending from a putative exon..
 	{
-		if(Skip==0)// || (R.End-R.Start < SAGAP_CUTOFF_T))//first l-mer..
+		//TODO: enable this for speed
+		/*if(Skip==0)// || (R.End-R.Start < SAGAP_CUTOFF_T))//first l-mer..
 		{
-			MF_Pre.Hit_Array[0]=R;MF_Pre.Hit_Array_Ptr=1;//Read_Head=0;
+			Reset_MEMX(MF_Pre);
+			MF_Pre.Hit_Array[0]=R;MF_Pre.Hit_Array_Ptr=1;
+			MF_Pre.Exact_Match_Forward[L.LH-1].Start=0;//This is workaround.. need to store the exact value..
 		}
-		else
+		else*/
 		{
-			MF_Pre.Current_Tag=Converted_Read;
+			MF_Pre.Current_Tag=Converted_Read;MF_Pre.Hit_Array_Ptr=0;MF_Pre.Hits=0;
 			Last_Mis_Pre=Scan(MF_Pre,MAX_MISMATCHES,L,fwfmi,revfmi,0,UINT_MAX);
 		}
 	}
 	else
 	{
 		MF_Pre.Hit_Array[0].Start=MF_Pre.Hit_Array[0].End=Anchor;MF_Pre.Hit_Array_Ptr=1;
+		MF_Pre.Hit_Array[1].Start=0;
 		Mis_In_Head=R.Mismatches;//Read_Head=0;
 	}
 	int Top_Hit_End=MF_Pre.Hit_Array_Ptr;//Save the end point top hits..
@@ -891,4 +896,17 @@ void fillProbArray(float prob[16][64][2], string filename) {
 void Init_Prob() {
 	fillProbArray(Donor_Prob,"donors.txt");
 	fillProbArray(Acc_Prob,"acceptors.txt");
+}
+
+void Reset_MEMX(MEMX & M)
+{
+	M.Left_Mishits_Pointer=0;
+	M.Right_Mishits_Pointer=0;
+	M.Possible_20_Pointer=0;
+	M.Possible_02_Pointer=0;
+	M.Mismatches_Forward_Pointer=0;
+	M.Mismatches_Backward_Pointer=0;
+	M.Two_Mismatches_At_End_Pointer=0;
+	M.Two_Mismatches_At_End_Forward_Pointer=0;
+	M.Hit_Array_Ptr=0;
 }

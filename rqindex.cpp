@@ -23,7 +23,9 @@ int Scan(MEMX & MF,int MAX_MISMATCHES, LEN & L,BWT* fwfmi,BWT* revfmi,int Next_M
 	assert(Next_Mis >=0);assert(MAX_MISMATCHES >= Next_Mis);assert (Next_Mis <= 5);
 	int In_Mis=0,Hits=0;MF.Hits=0;//MC.Hits=0;
 	if (Next_Mis == 0) goto Zero; else if (Next_Mis ==1) goto One;else if (Next_Mis ==2) goto Two;else if (Next_Mis ==3) goto Three;else if (Next_Mis ==4) goto Four; else goto Five;
+	assert(Next_Mis||MF.Hit_Array_Ptr);
 Zero:
+	assert(MF.Hit_Array_Ptr==0);
 	Hits+=Zero_Mismatch(MF.Current_Tag,L,revfmi,MF);
 	//Hits+=Zero_Mismatch(MC.Current_Tag,L,revfmi,MC);
 One:
@@ -555,7 +557,6 @@ int Pair_Reads(SARange *Head_Hits,SARange *Tail_Hits,PAIR *Pairs,int & Pairs_Ind
 	Multi_Head[SAGAP_CUTOFF+1];
 	static int Sum=0;
 	int Err=0;
-
 	for(int i=0;Head_Hits[i].Start;i++)//Iterate Head Hits
 	{
 		for(int j=0;Tail_Hits[j].Start;j++)//With Tail Hits

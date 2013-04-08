@@ -683,6 +683,7 @@ unsigned One_Mismatch(char* Current_Tag,LEN L, int MAXHITS, BWT* fwfmi, BWT* rev
 	Range=M.Exact_Match_Forward[L.LH-1];//[Start+L.LH];
 	if(Range.Start )//&& Range.Tag == Actual_Tag)//if there are hits of the form 0|?
 	{
+		assert(Range.Start!=INT_MAX);
 		Range.Level=1;
 		/*if(USEQUALITY)
 		{
@@ -4303,24 +4304,6 @@ void Extend_Forwards(const char* Current_Tag,const struct SARange & Tag,int Coun
 					}
 					else
 					{
-						if(5 >Count)//store only for one mismatch... and last node will not branch
-						{
-							if (Temp_Range.Level!=StringLength) Temp_Range.Level++; 
-							else //2 mismatches with the last at the end...
-							{
-								if(M.Two_Mismatches_At_End_Forward_Pointer < M.END_BOUND)
-								{
-									M.Two_Mismatches_At_End_Forward[M.Two_Mismatches_At_End_Forward_Pointer]=Temp_Range;
-									M.Two_Mismatches_At_End_Forward_Pointer++;
-								}
-								continue;
-							}
-							if(M.Mismatches_Forward_Pointer < M.ARRAY_BOUND)
-							{
-								M.Mismatches_Forward[M.Mismatches_Forward_Pointer]=Temp_Range;
-								M.Mismatches_Forward_Pointer++;
-							}
-						}
 						continue;
 					}
 				} 
