@@ -200,7 +200,6 @@ int main(int argc, char* argv[])
 
 			int Label=0;
 			Actual_Tag++;
-		//	cout << Actual_Tag<<endl;
 
 			Max_Junc_Found=INT_MAX;
 			Least_Mis_In_Junc=INT_MAX;
@@ -419,7 +418,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 			else if(dist>60) Junc_Score+=1;
 		}
 		int tempScore = -3*Final_Juncs[i].Mismatches+Junc_Score;//+Final_Juncs[i].score;
-		if(Final_Juncs[i].Junc_Count<=Max_Junc_Count && tempScore >= max)
+		if(Final_Juncs[i].Junc_Count<=1 && tempScore >= max)
 		{
 			if(tempScore!=max) ptr = 0;
 			max = tempScore;
@@ -773,11 +772,9 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 			return DUMMY_JUNC;
 		}
 	}
-//DEBUG
-	Generic_Hits.Hit_Array_Ptr=INT_MAX;
+
 	if(Align(S+Read_Skip,MINX,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip,R,Read_Skip+MINX,Read_Skip))//Can exact extension be done..
 	{
-		assert(Generic_Hits.Hit_Array_Ptr!=INT_MAX);
 		std::vector <SARange> Hits(Generic_Hits.Hit_Array_Ptr);
 		for (int i=0;i<Generic_Hits.Hit_Array_Ptr;i++)//Save hits in a vector..
 		{

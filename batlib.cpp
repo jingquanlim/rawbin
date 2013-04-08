@@ -6,7 +6,6 @@ using namespace std;
 #include <emmintrin.h>
 #include <signal.h> 
 #include <assert.h> 
-//#include "/usr/local/include/valgrind/memcheck.h"
 //#include <dvec.h>
 #include <getopt.h>
 #include <ctype.h>
