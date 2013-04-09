@@ -52,9 +52,10 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 		Genome_Offsets[Final_Juncs[i].ID].Junc_Hash->Insert(Pair,Final_Juncs[i],Hit_ID? false:true);
 
 		char* CIGAR_ptr=CIGAR;
-		int Last=0;
+		int Last=0;int Label=Final_Juncs[i].Label;
 		for(int j=0;j<Final_Juncs[i].Junc_Count;j++)
 		{
+			assert(Label==Final_Juncs[i].Label);
 			CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM%dN",Final_Juncs[i+j].r,Final_Juncs[i+j].q-Final_Juncs[i+j].p+1);
 			Last+=Final_Juncs[i+j].r;
 		}

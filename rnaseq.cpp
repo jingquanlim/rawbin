@@ -407,12 +407,25 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 
 	for(int i =0; Final_Juncs[i].p != UINT_MAX; i+=(Final_Juncs[i].Junc_Count)? Final_Juncs[i].Junc_Count:1)
 	{
-		int Junc_Score=Final_Juncs[i].Type;
+		int Junc_Score=0;
 		if(!Final_Juncs[i].q) Junc_Score=4;
 		else
 		{
-			assert(Final_Juncs[i].q>Final_Juncs[i].p);
-			int dist=Final_Juncs[i].q-Final_Juncs[i].p;
+			int Junc_Count=Final_Juncs[i].Junc_Count;
+			int Label=Final_Juncs[i].Label;
+			unsigned dist= 0;
+
+			for(int j=0;j<Junc_Count;j++)
+			{
+				assert(Label==Final_Juncs[i+j].Label);
+				Junc_Score+=Final_Juncs[i+j].Type;
+				if(dist<(Final_Juncs[i+j].q-Final_Juncs[i+j].p))
+				{
+					dist=Final_Juncs[i+j].q-Final_Juncs[i+j].p;
+				}
+			}
+
+			assert(dist>0);
 			if(dist>30000) Junc_Score+=1;
 			else if(dist>5000) Junc_Score+=2;
 			else if(dist>2000) Junc_Score+=3;
