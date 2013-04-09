@@ -359,9 +359,10 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 			int Last=0;
 			for(int j=0;j<Junc_Count;j++)
 			{
-				Get_Bases_ASCII(Final_Juncs[i+j].p-(Final_Juncs[i+j].r-Last), (Final_Juncs[i+j].r-Last), Cat+Last);
+				Get_Bases_ASCII(Final_Juncs[i+j].p-(Final_Juncs[i+j].r), (Final_Juncs[i+j].r), Cat+Last);
+				Last+=Final_Juncs[i+j].r;
 			}
-			Get_Bases_ASCII(Final_Juncs[i+Junc_Count-1].q+1, StringLength-Final_Juncs[i+Junc_Count-1].r, Cat+Final_Juncs[i+Junc_Count-1].r);
+			Get_Bases_ASCII(Final_Juncs[i+Junc_Count-1].q+1, StringLength-Last, Cat+Last);
 		}
 		else
 		{
@@ -404,7 +405,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 		Final_Juncs[i].score= Mismatch_Pos[0];
 	}
 
-	for(int i =0; Final_Juncs[i].p != UINT_MAX; i++) 
+	for(int i =0; Final_Juncs[i].p != UINT_MAX; i+=(Final_Juncs[i].Junc_Count)? Final_Juncs[i].Junc_Count:1)
 	{
 		int Junc_Score=Final_Juncs[i].Type;
 		if(!Final_Juncs[i].q) Junc_Score=4;
@@ -419,7 +420,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 			else if(dist>60) Junc_Score+=1;
 		}
 		int tempScore = -3*Final_Juncs[i].Mismatches+Junc_Score;//+Final_Juncs[i].score;
-		if(Final_Juncs[i].Junc_Count<=1 && tempScore >= max)
+		if(Final_Juncs[i].Junc_Count<=2 && tempScore >= max)
 		{
 			if(tempScore!=max) ptr = 0;
 			max = tempScore;
@@ -702,10 +703,6 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 	assert(Trans_Array_Ptr<MAX_JUNCS_IN_TRANSCRIPT);assert(Read_Skip>=0 && StringLength >=0 && StringLength<=READLEN && Inspected_Pairs>=0);
 	if(Read_Skip>StringLength-MINX)//End of read..
 	{
-		if(Junc_Count) 
-		{
-			Max_Junc_Found=Junc_Count;
-		}
 		if(Align(S+Read_Skip,StringLength-Read_Skip,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip,R,StringLength,Read_Skip))//End of the read can be matched..
 		{
 			if(!Junc_Count)//Match..
@@ -743,6 +740,10 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 				return TRANCRIPT_END;
 			}
 
+			if(Junc_Count) 
+			{
+				Max_Junc_Found=Junc_Count;
+			}
 			if(Least_Mis_In_Junc> Mis_In_Junc_Count) Least_Mis_In_Junc=Mis_In_Junc_Count; 
 			Transcript_Number++;
 			if(Max_Junc_Count<Junc_Count)//count max transcribed juncs..

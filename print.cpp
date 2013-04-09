@@ -55,8 +55,8 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 		int Last=0;
 		for(int j=0;j<Final_Juncs[i].Junc_Count;j++)
 		{
-			CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM%dN",Final_Juncs[i+j].r-Last,Final_Juncs[i+j].q-Final_Juncs[i+j].p+1);
-			Last=Final_Juncs[i+j].r;
+			CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM%dN",Final_Juncs[i+j].r,Final_Juncs[i+j].q-Final_Juncs[i+j].p+1);
+			Last+=Final_Juncs[i+j].r;
 		}
 		sprintf(CIGAR_ptr,"%dM",READLEN-Last);
 
