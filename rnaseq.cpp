@@ -118,7 +118,7 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 int Seek_Single_Strand(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf,int Sign);
 int Seek_All_Junc(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf);
 int Find_Single_Junc(char* Read,char* Read_Head,char* Converted_Read,MEMX & MF_Pre,MEMX & MF_Suf,int STRINGLENGTH,LEN & L,PAIR* & Pairs,Junction *Final_Juncs,int & Err,int & Label,char Sign,unsigned Anchor,SARange & R,int Skip);
-void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int StringLength, unsigned Anchor,int & Inspected_Pairs,SARange & R,int Junc_Count,int Mis_In_Junc_Count,int & Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int Skip,int & Err,int Sign);
+void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int StringLength, unsigned Anchor,int & Inspected_Pairs,SARange & R,int Junc_Count,int Mis_In_Junc_Count,int & Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int Skip,int & Err,int Sign,int Fragment);
 void Load_All_Indexes(Index_Info Genome_Files,BWT* & fwfmi,BWT* & revfmi,MMPool* & mmPool,RANGEINDEX & Range_Index);
 void Init(BWT *revfmi,unsigned & SOURCELENGTH,PAIR* & Pairs,gzFile & Input_File,gzFile & Mate_File,FILETYPE & File_Info,Parameters & CL,FILE* & OUT,Index_Info & Genome_Files);
 bool  Progress_Bar(Parameters & CL,unsigned & Number_of_Tags,unsigned & Progress,unsigned & Tag_Count,FILETYPE & File_Info);
@@ -270,26 +270,6 @@ inline void Convert_Reverse(char* Read,char * RC_Read,char* RC_Bin,int StringLen
 	}
 }
 
-
-/* 
- * ===  FUNCTION  ======================================================================
- *         Name:  Find_All_Single_Junc
- *  Description:  Find all Single junctions in the read Read and its reverse compliment.. 
- *  		  Returns least mismatch junctions in Final_Juncs, terminated by sentinel Final_Junc[Last].p=INT_MAX 
- *  		  Err is set if there were overflows in hits, 
- *  		  returns zero if no junctions found.. 
- *  		  Label will increase by one for each putative junction, disregarding those found in extensions
- * =====================================================================================
- */
-/*int Find_All_Single_Junc(char* Read,char* Converted_Read,MEMX & Pre,MEMX & Suf,int STRINGLENGTH,LEN & L,PAIR* Pairs,Junction *Final_Juncs,int & Err,int & Label)
-{
-	//int Result=Find_Single_Junc(Head.Tag_Copy,Head.Tag,MF_Pre,MF_Suf,File_Info.STRINGLENGTH,L,Pairs,Final_Juncs,Err,Label);
-	char RC_Read[MAXDES],RC_Bin[MAXDES];
-	int Result1=Find_Single_Junc(Read,Converted_Read,Pre,Suf,STRINGLENGTH,L,Pairs,Final_Juncs,Err,Label,'+');
-	Convert_Reverse(Converted_Read,RC_Read,RC_Bin,STRINGLENGTH);Final_Juncs+=Result1;
-	int Result2=Find_Single_Junc(RC_Read,RC_Bin,Pre,Suf,STRINGLENGTH,L,Pairs,Final_Juncs,Err,Label,'-');
-	return Result1+Result2;
-}*/
 
 
 int Classify_Hits(Junction * Final_Juncs, int & firstSignal){
@@ -808,7 +788,10 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 			//the junction is between S[Read_Skip,Read_Skip+18]
 			//so anchor S[Read_Skip-18,Read_Skip]
 			//Penguin S[Read_Skip-18,Read_Skip] ---- S[Read_Skip+18,Read_Skip+36] and extend..
-			Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign);
+			Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX);
+			Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-6);
+			Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-12);
+			Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-15);
 		}
 	}
 
@@ -816,7 +799,7 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 
 }
 
-void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int StringLength, unsigned Anchor,int & Inspected_Pairs,SARange & R,int Junc_Count,int Mis_In_Junc_Count,int & Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int Skip,int & Err,int Sign)
+void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int StringLength, unsigned Anchor,int & Inspected_Pairs,SARange & R,int Junc_Count,int Mis_In_Junc_Count,int & Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int Skip,int & Err,int Sign,int Fragment)
 {
 	assert(StringLength<=READLEN && Converted_Read && Read_Skip>=0 && StringLength >0);
 	char Read[200];
@@ -826,7 +809,6 @@ void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int
 	int Label=0;
 	LEN L;
 
-	int Fragment=3*MINX;
 	if(Read_Skip+2*MINX >StringLength)//cannot penguin 18-mers
 	{
 		Fragment=MINX+StringLength-Read_Skip;
