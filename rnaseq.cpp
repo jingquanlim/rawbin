@@ -71,9 +71,11 @@ struct Transcript
 const int MAX_JUNCS_ALLOWED=1000;
 const int MAX_JUNCS_IN_TRANSCRIPT=20;//Maximum number of junctions that are allowed in a trascript..
 const int MAX_INSPECTED_PAIRS=20000;//INT_MAX;
-Junction Trans_Array[MAX_JUNCS_IN_TRANSCRIPT];
-Junction Compiled_Junctions[MAX_JUNCS_ALLOWED];
+Junction Trans_Array[MAX_JUNCS_IN_TRANSCRIPT+1];
+Junction Compiled_Junctions[MAX_JUNCS_ALLOWED+1];
+Junction Partial_Junctions[MAX_JUNCS_ALLOWED+1];
 int Compiled_Junctions_Ptr;
+int Partial_Junctions_Ptr;
 
 int INDEX_RESOLUTION=30000;
 int EXONGAP;
@@ -193,7 +195,7 @@ int main(int argc, char* argv[])
 	{
 		fprintf(stderr,"======================]\r[");//progress bar....
 		int Actual_Tag=0;
-		int selectedJunctions[MAX_JUNCS_ALLOWED];
+		int selectedJunctions[MAX_JUNCS_ALLOWED+1];
 		while (Read_Tag(Head,Tail,Input_File,Mate_File,File_Info))
 		{
 			if(!Progress_Bar(CL,Number_of_Tags,Progress,Tag_Count,File_Info)) break;
@@ -205,6 +207,7 @@ int main(int argc, char* argv[])
 			Max_Junc_Found=INT_MAX;
 			Least_Mis_In_Junc=INT_MAX;
 			Compiled_Junctions_Ptr=0;
+			Partial_Junctions_Ptr=0;
 			Transcript_Number=0;
 			Max_Junc_Count=0;
 			int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf);
@@ -227,39 +230,13 @@ int main(int argc, char* argv[])
 				}	
 				else 
 				{
+					assert(approvedPtr);
 					for(int i=0; i<approvedPtr; i++) {
 						Print_Hits(Head,Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType,0);//tempType);
 					}
 				}
 
 			}
-			else
-			{
-				//if(Err) SAM[1] << ">ERR:";
-				//SAM[1] << Head.Description << Head.Tag_Copy;
-
-			}
-
-			/*if(Find_All_Single_Junc(Head.Tag_Copy,Head.Tag,MF_Pre,MF_Suf,File_Info.STRINGLENGTH,L,Pairs,Final_Juncs,Err,Label))
-			{
-				if(Label==1)//One junction..
-				{
-					int firstSignal = -2;
-					int tempType = Classify_Hits(Head,Final_Juncs,firstSignal);
-					if(tempType != 2)
-						firstSignal = -2;
-					Print_Hits(Head,Final_Juncs,OUT,SAM[tempType],Tag_Count,firstSignal,tempType);
-				}
-				else//Multiple Junctions..
-				{
-					
-				}
-			}
-			else//Read is not mapped
-			{
-				
-				if(!Err) ;//printf(">%d-%s%s",Tag_Count,Head.Description,Head.Tag_Copy);
-			}*/
 		}
 		UnLoad_Indexes(fwfmi,revfmi,mmPool,Range_Index);
 		fprintf(stderr,"\r[++++++++100%%+++++++++]\n");//progress bar....
@@ -388,7 +365,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 		}
 
 		Final_Juncs[i].score= 0;
-		if(Final_Juncs[i].r>(StringLength-Final_Juncs[i].r))//large part is in first anchor..
+		/*if(Final_Juncs[i].r>(StringLength-Final_Juncs[i].r))//large part is in first anchor..
 		{
 			if(Mismatch_Pos[0]>Final_Juncs[i].r)
 			{
@@ -402,7 +379,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 				Final_Juncs[i].score= -1;
 			}
 		}
-		Final_Juncs[i].score= Mismatch_Pos[0];
+		Final_Juncs[i].score= Mismatch_Pos[0];*/
 	}
 
 	for(int i =0; Final_Juncs[i].p != UINT_MAX; i+=(Final_Juncs[i].Junc_Count)? Final_Juncs[i].Junc_Count:1)
@@ -713,7 +690,7 @@ inline void B2C(char *S,char *D,int StringLength)
 
 int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Count,unsigned Last_Exon,int StringLength,int Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int & Inspected_Pairs,int & Err,bool Sign)
 {
-	assert(Trans_Array_Ptr<MAX_JUNCS_IN_TRANSCRIPT);assert(Read_Skip>=0 && StringLength >=0 && StringLength<=READLEN && Inspected_Pairs>=0);
+	assert(Trans_Array_Ptr<MAX_JUNCS_IN_TRANSCRIPT && Compiled_Junctions_Ptr>=0);assert(Read_Skip>=0 && StringLength >=0 && StringLength<=READLEN && Inspected_Pairs>=0);
 	if(Read_Skip>StringLength-MINX)//End of read..
 	{
 		if(Align(S+Read_Skip,StringLength-Read_Skip,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip,R,StringLength,Read_Skip))//End of the read can be matched..
@@ -750,6 +727,7 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 						}
 					}
 				}
+				assert(Compiled_Junctions_Ptr>0 && Compiled_Junctions_Ptr<=MAX_JUNCS_ALLOWED);
 				return TRANCRIPT_END;
 			}
 
@@ -761,33 +739,40 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 			Transcript_Number++;
 			if(Max_Junc_Count<Junc_Count)//count max transcribed juncs..
 				Max_Junc_Count=Junc_Count;
-			for(int i=0;i<Junc_Count;i++)
+
+			if(Compiled_Junctions_Ptr+Junc_Count<= MAX_JUNCS_ALLOWED)
 			{
-				if(Compiled_Junctions_Ptr< MAX_JUNCS_ALLOWED)
+				for(int i=0;i<Junc_Count;i++)
 				{
 					Trans_Array[i].Junc_Count=Junc_Count;Trans_Array[i].Label=Transcript_Number;Trans_Array[i].Sign=(Sign)? 1:0;Trans_Array[i].Mismatches=R.Mismatches;Compiled_Junctions[Compiled_Junctions_Ptr++]=Trans_Array[i];
 				}
-				else
-				{
-					Err=1;
-				}
 			}
+			else
+			{
+				Err=1;
+			}
+
+			assert(Compiled_Junctions_Ptr>0 && Compiled_Junctions_Ptr<=MAX_JUNCS_ALLOWED);
 			return TRANCRIPT_END;
 		}
 		else//End of the read may contain extra junc that cannot be processed..
 		{
 			if(Junc_Count && Least_Mis_In_Junc> Mis_In_Junc_Count) Least_Mis_In_Junc=Mis_In_Junc_Count; 
-			for(int i=0;i<Junc_Count;i++)
+
+			int JC=(Junc_Count)? Junc_Count:1;//TODO
+			if(Partial_Junctions_Ptr+JC< MAX_JUNCS_ALLOWED)
 			{
-				if(Compiled_Junctions_Ptr< MAX_JUNCS_ALLOWED)
+				for(int i=0;i<JC;i++)
 				{
-					Trans_Array[i].Junc_Count=Junc_Count;Trans_Array[i].Label=Transcript_Number;Trans_Array[i].Sign=(Sign)? 1:0;Trans_Array[i].Mismatches=R.Mismatches;Compiled_Junctions[Compiled_Junctions_Ptr++]=Trans_Array[i];
-				}
-				else
-				{
-					Err=1;
+					Trans_Array[i].Junc_Count=Junc_Count;Trans_Array[i].Label=Transcript_Number;Trans_Array[i].Sign=(Sign)? 1:0;Trans_Array[i].Mismatches=R.Mismatches;Partial_Junctions[Partial_Junctions_Ptr++]=Trans_Array[i];
 				}
 			}
+			else
+			{
+				Err=1;
+			}
+
+			assert(Partial_Junctions_Ptr>0 && Partial_Junctions_Ptr<=MAX_JUNCS_ALLOWED);
 			return DUMMY_JUNC;
 		}
 	}
@@ -818,7 +803,7 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 	if(Read_Skip>=MINX)
 	{
 		//Case of a single junction between S[a,a+2l-1]
-		if (Junc_Count<Max_Junc_Found) //This will add one junction..
+		if (Junc_Count-1<Max_Junc_Found) //This will add one junction..
 		{
 			//the junction is between S[Read_Skip,Read_Skip+18]
 			//so anchor S[Read_Skip-18,Read_Skip]

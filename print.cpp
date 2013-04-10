@@ -41,20 +41,20 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 		OP Pair;
 
 		Ann_Info A;
-		Location_To_Genome(Final_Juncs[i].p,A);
-		Location_To_Genome(Final_Juncs[i].q,A);
-
-		Pair.x=Final_Juncs[i].p;
-		Pair.y=Final_Juncs[i].q;
-		Final_Juncs[i].L=Final_Juncs[i].r;
-		Final_Juncs[i].R=READLEN-Final_Juncs[i].r;
-		assert(Genome_Offsets[Final_Juncs[i].ID].Offset !=INT_MAX);
-		Genome_Offsets[Final_Juncs[i].ID].Junc_Hash->Insert(Pair,Final_Juncs[i],Hit_ID? false:true);
-
 		char* CIGAR_ptr=CIGAR;
 		int Last=0;int Label=Final_Juncs[i].Label;
 		for(int j=0;j<Final_Juncs[i].Junc_Count;j++)
 		{
+			Location_To_Genome(Final_Juncs[i+j].p,A);//TODO:one lookup should be enough..
+			Location_To_Genome(Final_Juncs[i+j].q,A);
+
+			Pair.x=Final_Juncs[i+j].p;
+			Pair.y=Final_Juncs[i+j].q;
+			//Final_Juncs[i].L=Final_Juncs[i].r;
+			//Final_Juncs[i].R=READLEN-Final_Juncs[i].r;
+			assert(Genome_Offsets[Final_Juncs[i+j].ID].Offset !=INT_MAX && Final_Juncs[i+j].ID==Final_Juncs[i].ID );
+			Genome_Offsets[Final_Juncs[i].ID].Junc_Hash->Insert(Pair,Final_Juncs[i+j],Hit_ID? false:true);
+
 			assert(Label==Final_Juncs[i].Label);
 			CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM%dN",Final_Juncs[i+j].r,Final_Juncs[i+j].q-Final_Juncs[i+j].p+1);
 			Last+=Final_Juncs[i+j].r;

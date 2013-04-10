@@ -4,4 +4,5 @@
 ./samtobedX 76.1.1mis.sam 
 #verifying..
 python ../python/findNovelJunctions.py bam/130.1.1mis.sam.bed ../test_data/mapsplice/130bp/1junc.1mis/best_remapped_junction.bed
+./check_junc 2 #check all progremas for 2 junc 1 mis..
 

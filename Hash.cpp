@@ -18,11 +18,11 @@ void Hash::Insert (OP Location,Junction & J,bool Unique)
 	if (Junc_I == Junctions.end()) //New entry..
 	{
 		T.Count=1;T.Junc_Type=Paring;
-		for(int i=0;i<ENT_LIM-15;i++)
+		/*for(int i=0;i<ENT_LIM-15;i++)
 		{
 			T.L_Anchor[i]=0;
 			T.R_Anchor[i]=0;
-		}
+		}*/
 		if (Unique)
 			T.Unique=true;
 		else
@@ -31,10 +31,10 @@ void Hash::Insert (OP Location,Junction & J,bool Unique)
 	}
 	else 
 	{
-		assert(J.L>=0 && J.R>=0);
+		//assert(J.L>=0 && J.R>=0);
 		assert((Junc_I->second).Count>0 && (Junc_I->second).Junc_Type==Paring);
 		(Junc_I->second).Count++;
-		if(J.L>=ENT_LIM)
+		/*if(J.L>=ENT_LIM)
 		{
 			if ((Junc_I->second).L_Anchor[ENT_LIM-1]!=CHAR_MAX) (Junc_I->second).L_Anchor[ENT_LIM-1]++;
 		}
@@ -44,7 +44,7 @@ void Hash::Insert (OP Location,Junction & J,bool Unique)
 		{
 			if ((Junc_I->second).R_Anchor[ENT_LIM-1]!=CHAR_MAX) (Junc_I->second).R_Anchor[ENT_LIM-1]++;
 		}
-		else if ((Junc_I->second).R_Anchor[J.L]!=CHAR_MAX) (Junc_I->second).R_Anchor[ENT_LIM-1]++;
+		else if ((Junc_I->second).R_Anchor[J.L]!=CHAR_MAX) (Junc_I->second).R_Anchor[ENT_LIM-1]++;*/
 		if (Unique)
 			(Junc_I->second).Unique=true;
 	}
