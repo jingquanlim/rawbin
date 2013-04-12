@@ -27,7 +27,7 @@ inline char* Nullify_String(char* S)
 	return Strend;
 }
 
-void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int Tag_Count, int firstSignal,int Junc_Type,unsigned Hit_ID)
+void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int Tag_Count, int firstSignal,int Junc_Type,unsigned Hit_ID,int Err)
 {
 	//fprintf(OUT,"%s",Head.Description);  
 	Nullify_String(Head.Description+1);
@@ -43,7 +43,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 		Ann_Info A;
 		char* CIGAR_ptr=CIGAR;
 		int Last=0;int Label=Final_Juncs[i].Label;
-		for(int j=0;j<Final_Juncs[i].Junc_Count;j++)
+		for(int j=0;!Err && j<Final_Juncs[i].Junc_Count;j++)
 		{
 			Location_To_Genome(Final_Juncs[i+j].p,A);//TODO:one lookup should be enough..
 			Location_To_Genome(Final_Juncs[i+j].q,A);
@@ -71,7 +71,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 			<< "*\t0\t0\t" 
 			<< Head.Tag_Copy << "\t" 
 			<< "*\t"
-			<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" << "NH:f:" << Final_Juncs[i].score <<endl;
+			<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" << "NH:f:" << Final_Juncs[i].score <<"\tER:i:"<<Err<<endl;
 	}
 	else
 	{
@@ -88,7 +88,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 			<< "*\t0\t0\t" 
 			<< Head.Tag_Copy << "\t" 
 			<< "*\t"
-			<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" <<"NH:f:" << Final_Juncs[i].score <<endl;
+			<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" <<"NH:f:" << Final_Juncs[i].score <<"\tER:i:"<<Err<<endl;
 	}
 }
 

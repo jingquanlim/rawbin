@@ -68,14 +68,9 @@ struct Transcript
 };
 
 //Transcript Trans_Array[20];
-const int MAX_JUNCS_ALLOWED=1000;
+const int MAX_JUNCS_ALLOWED=100;
 const int MAX_JUNCS_IN_TRANSCRIPT=20;//Maximum number of junctions that are allowed in a trascript..
 const int MAX_INSPECTED_PAIRS=20000;//INT_MAX;
-Junction Trans_Array[MAX_JUNCS_IN_TRANSCRIPT+1];
-Junction Compiled_Junctions[MAX_JUNCS_ALLOWED+1];
-Junction Partial_Junctions[MAX_JUNCS_ALLOWED+1];
-int Compiled_Junctions_Ptr;
-int Partial_Junctions_Ptr;
 
 int INDEX_RESOLUTION=30000;
 int EXONGAP;
@@ -97,28 +92,35 @@ int ORG_STRINGLENGTH;
 
 unsigned RQ_Hits;
 SA* SA_Index;
+int* SA_Blocks;
 char COMPRESS;
-int *SA_Blocks;
-int Max_Junc_Found;
-int Transcript_Number;
-int Max_Junc_Count;
-int Least_Mis_In_Junc;
-MEMX Generic_Hits;
 
 float Donor_Prob[16][64][2];
 float Acc_Prob[16][64][2];
 //}---------------------------- GLOBAL VARIABLES -------------------------------------------------
 
-
+struct Transcript_Data
+{
+	Junction Trans_Array[MAX_JUNCS_IN_TRANSCRIPT+1];
+	Junction Compiled_Junctions[MAX_JUNCS_ALLOWED+1];
+	Junction Partial_Junctions[MAX_JUNCS_ALLOWED+1];
+	int Compiled_Junctions_Ptr;
+	int Partial_Junctions_Ptr;
+	int Max_Junc_Found;
+	int Transcript_Number;
+	int Max_Junc_Count;
+	int Least_Mis_In_Junc;
+	MEMX Generic_Hits;
+};
 
 //{-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 int Find_All_Single_Junc(char* Read,char* Converted_Read,MEMX & Pre,MEMX & Suf,int STRINGLENGTH,LEN & L,PAIR* Pairs,Junction *Final_Juncs,int & Err,int & Label);
-bool Align(char* Source,int StringLength,unsigned Dest_Loc,SARange & R,int Actual_Length,int Read_Skip);
-int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Count,unsigned Last_Exon,int StringLength,int Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int & Inspected_Pairs,int & Err,bool Sign);
-int Seek_Single_Strand(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf,int Sign);
-int Seek_All_Junc(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf);
+bool Align(char* Source,int StringLength,unsigned Dest_Loc,SARange & R,int Actual_Length,int Read_Skip,Transcript_Data & TD);
+int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Count,unsigned Last_Exon,int StringLength,int Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int & Inspected_Pairs,int & Err,bool Sign,Transcript_Data & TD);
+int Seek_Single_Strand(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf,int Sign,Transcript_Data & TD);
+int Seek_All_Junc(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf,Transcript_Data & TD);
 int Find_Single_Junc(char* Read,char* Read_Head,char* Converted_Read,MEMX & MF_Pre,MEMX & MF_Suf,int STRINGLENGTH,LEN & L,PAIR* & Pairs,Junction *Final_Juncs,int & Err,int & Label,char Sign,unsigned Anchor,SARange & R,int Skip);
-void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int StringLength, unsigned Anchor,int & Inspected_Pairs,SARange & R,int Junc_Count,int Mis_In_Junc_Count,int & Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int Skip,int & Err,int Sign,int Fragment);
+void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int StringLength, unsigned Anchor,int & Inspected_Pairs,SARange & R,int Junc_Count,int Mis_In_Junc_Count,int & Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int Skip,int & Err,int Sign,int Fragment,Transcript_Data & TD);
 void Load_All_Indexes(Index_Info Genome_Files,BWT* & fwfmi,BWT* & revfmi,MMPool* & mmPool,RANGEINDEX & Range_Index);
 void Init(BWT *revfmi,unsigned & SOURCELENGTH,PAIR* & Pairs,gzFile & Input_File,gzFile & Mate_File,FILETYPE & File_Info,Parameters & CL,FILE* & OUT,Index_Info & Genome_Files);
 bool  Progress_Bar(Parameters & CL,unsigned & Number_of_Tags,unsigned & Progress,unsigned & Tag_Count,FILETYPE & File_Info);
@@ -133,10 +135,13 @@ void Init_Prob();
 void fillProbArray(float prob[16][64][2], string filename);
 int getBest(char* Current_Tag,int StringLength,Junction * Compiled_Junctions, int * approved, bool print);
 void Reset_MEMX(MEMX & M);
+bool Exons_Too_Small(int Trans_Array_Ptr,Transcript_Data & TD);
 //}-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 
 int main(int argc, char* argv[])
 {
+
+	Transcript_Data TD;
 	unsigned Total_Hits=0,Tags_Processed=0,Tag_Count=0;
 	time_t Start_Time,End_Time;
 	unsigned Number_of_Tags=1000;
@@ -184,7 +189,7 @@ int main(int argc, char* argv[])
 	MEMX MF_Pre,MF_Suf;//MemX is the data structure for doing Batman alignment. MF_Pre is for the prefix, MC for suffix..
 	Init_Batman(MF_Pre,L,MLook,MAX_MISMATCHES);
 	Init_Batman(MF_Suf,L,MLook,MAX_MISMATCHES);
-	Init_Batman(Generic_Hits,L,MLook,MAX_MISMATCHES);
+	Init_Batman(TD.Generic_Hits,L,MLook,MAX_MISMATCHES);
 //--------------------- Setup Data Structure for Batman End----------------------------------------
 	
 
@@ -204,35 +209,35 @@ int main(int argc, char* argv[])
 			int Label=0;
 			Actual_Tag++;
 
-			Max_Junc_Found=INT_MAX;
-			Least_Mis_In_Junc=INT_MAX;
-			Compiled_Junctions_Ptr=0;
-			Partial_Junctions_Ptr=0;
-			Transcript_Number=0;
-			Max_Junc_Count=0;
-			int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf);
-			Compiled_Junctions[Compiled_Junctions_Ptr].p=UINT_MAX;
+			TD.Max_Junc_Found=INT_MAX;
+			TD.Least_Mis_In_Junc=INT_MAX;
+			TD.Compiled_Junctions_Ptr=0;
+			TD.Partial_Junctions_Ptr=0;
+			TD.Transcript_Number=0;
+			TD.Max_Junc_Count=0;
+			int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD);
+			TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
 
-			if(Compiled_Junctions_Ptr && !(DEBUG && Err))
+			if(TD.Compiled_Junctions_Ptr && !(DEBUG && Err))
 			{
 				int firstSignal = -2;
-				int tempType = Classify_Hits(Compiled_Junctions,firstSignal);
+				int tempType = Classify_Hits(TD.Compiled_Junctions,firstSignal);
 				int approvedPtr;
-				approvedPtr = getBest(Head.Tag,File_Info.STRINGLENGTH,Compiled_Junctions, selectedJunctions, true);
+				approvedPtr = getBest(Head.Tag,File_Info.STRINGLENGTH,TD.Compiled_Junctions, selectedJunctions, true);
 				
 				if(approvedPtr > 1) 
 				{
 					Hit_ID++;
 					for(int i=0; i<approvedPtr; i++) 
 					{
-						Print_Hits(Head,Compiled_Junctions,OUT,rejectedSAM,Tag_Count,selectedJunctions[i],tempType,Hit_ID);//tempType);
+						Print_Hits(Head,TD.Compiled_Junctions,OUT,rejectedSAM,Tag_Count,selectedJunctions[i],tempType,Hit_ID,Err);//tempType);
 					}
 				}	
 				else 
 				{
 					assert(approvedPtr);
 					for(int i=0; i<approvedPtr; i++) {
-						Print_Hits(Head,Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType,0);//tempType);
+						Print_Hits(Head,TD.Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType,0,Err);//tempType);
 					}
 				}
 
@@ -399,6 +404,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 		}
 
 	}
+	assert(ptr);
 	return ptr;
 }
 
@@ -578,6 +584,7 @@ int Find_Pairings(int & Pairs_Index,SARange* MF_Pre_Hits,SARange* MF_Suf_Hits,PA
 					if(Final_Juncs_Ptr>=MAX_JUNCS_TO_STORE-1) {Err=1;break;}
 					//Location_To_Genome(junctions[i].p,A);
 					//Location_To_Genome(junctions[i].q,A);
+					assert(Skip>=MINX || Skip==0);
 					junctions[i].r+=Skip;
 					S.p=junctions[i].p;
 					S.q=junctions[i].q; 	
@@ -616,7 +623,7 @@ int Find_Pairings(int & Pairs_Index,SARange* MF_Pre_Hits,SARange* MF_Suf_Hits,PA
  * =====================================================================================
  */
 
-bool Align(char* Source,int StringLength,unsigned Dest_Loc,SARange & R,int Actual_Length,int Read_Skip)
+bool Align(char* Source,int StringLength,unsigned Dest_Loc,SARange & R,int Actual_Length,int Read_Skip,Transcript_Data & TD)
 {
 	if(Dest_Loc!=UINT_MAX)//extend in genome..
 	{
@@ -636,27 +643,27 @@ bool Align(char* Source,int StringLength,unsigned Dest_Loc,SARange & R,int Actua
 		else
 		{
 			R.Mismatches+=Mis_Count;
-			Generic_Hits.Hit_Array[0]=R;
-			Generic_Hits.Hit_Array_Ptr=1;
+			TD.Generic_Hits.Hit_Array[0]=R;
+			TD.Generic_Hits.Hit_Array_Ptr=1;
 			return true;
 		}
 	}	
 	else
 	{
-		Generic_Hits.Hit_Array_Ptr=0;R.Level=1;
-		int T_Len=Generic_Hits.L.STRINGLENGTH;Generic_Hits.L.STRINGLENGTH=Actual_Length;
+		TD.Generic_Hits.Hit_Array_Ptr=0;R.Level=1;
+		int T_Len=TD.Generic_Hits.L.STRINGLENGTH;TD.Generic_Hits.L.STRINGLENGTH=Actual_Length;
 		int Lo=0;
-		Extend_Forwards(Source,R,/*MAX_MISMATCHES*/MIS_DENSITY,1,StringLength,INT_MAX,revfmi,Generic_Hits,true,Read_Skip,Lo);
+		Extend_Forwards(Source,R,/*MAX_MISMATCHES*/MIS_DENSITY,1,StringLength,INT_MAX,revfmi,TD.Generic_Hits,true,Read_Skip,Lo);
 		if(Lo)
 		{
 			SARange SA;
-			SA=Generic_Hits.Hit_Array[Lo];
-			Generic_Hits.Hit_Array[Lo]=Generic_Hits.Hit_Array[0];
-			Generic_Hits.Hit_Array[0]=SA;
+			SA=TD.Generic_Hits.Hit_Array[Lo];
+			TD.Generic_Hits.Hit_Array[Lo]=TD.Generic_Hits.Hit_Array[0];
+			TD.Generic_Hits.Hit_Array[0]=SA;
 			assert(SA.Mismatches==R.Mismatches);
 		}
-		Generic_Hits.L.STRINGLENGTH=T_Len;
-		if(Generic_Hits.Hit_Array_Ptr) return true;
+		TD.Generic_Hits.L.STRINGLENGTH=T_Len;
+		if(TD.Generic_Hits.Hit_Array_Ptr) return true;
 		else return false;
 	}
 }
@@ -668,23 +675,25 @@ inline void B2C(char *S,char *D,int StringLength)
 		*D="ACGT"[*S];
 }
 
-int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Count,unsigned Last_Exon,int StringLength,int Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int & Inspected_Pairs,int & Err,bool Sign)
+int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Count,unsigned Last_Exon,int StringLength,int Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int & Inspected_Pairs,int & Err,bool Sign,Transcript_Data & TD)
 {
-	assert(Trans_Array_Ptr<MAX_JUNCS_IN_TRANSCRIPT && Compiled_Junctions_Ptr>=0);assert(Read_Skip>=0 && StringLength >=0 && StringLength<=READLEN && Inspected_Pairs>=0);
+	assert(Trans_Array_Ptr<MAX_JUNCS_IN_TRANSCRIPT && TD.Compiled_Junctions_Ptr>=0);assert(Read_Skip>=0 && StringLength >=0 && StringLength<=READLEN && Inspected_Pairs>=0);
+	assert(Read_Skip>=MINX || Read_Skip==0);
 	if(Read_Skip>StringLength-MINX)//End of read..
 	{
-		if(Align(S+Read_Skip,StringLength-Read_Skip,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip,R,StringLength,Read_Skip))//End of the read can be matched..
+		if(Align(S+Read_Skip,StringLength-Read_Skip,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip,R,StringLength,Read_Skip,TD))//End of the read can be matched..
 		{
 			if(!Junc_Count)//Match..
 			{
+				TD.Max_Junc_Found=Junc_Count;
 				Junction J;J.Sign=(Sign)? 1:0;J.Mismatches=R.Mismatches;J.Junc_Count=0;
 				if (Last_Exon!=UINT_MAX)//one hit.. 
 				{
 					J.p=Last_Exon;
 					J.r=J.q=0;
-					if(Compiled_Junctions_Ptr<MAX_JUNCS_ALLOWED)
+					if(TD.Compiled_Junctions_Ptr<MAX_JUNCS_ALLOWED)
 					{
-						Compiled_Junctions[Compiled_Junctions_Ptr++]=J;
+						TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr++]=J;
 					}
 					else 
 					{
@@ -697,9 +706,9 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 					{
 						J.p=revfmi->textLength-READLEN-BWTSaValue(revfmi,i);;
 						J.r=J.q=0;
-						if(Compiled_Junctions_Ptr<MAX_JUNCS_ALLOWED)
+						if(TD.Compiled_Junctions_Ptr<MAX_JUNCS_ALLOWED)
 						{
-							Compiled_Junctions[Compiled_Junctions_Ptr++]=J;
+							TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr++]=J;
 						}
 						else 
 						{
@@ -707,24 +716,25 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 						}
 					}
 				}
-				assert(Compiled_Junctions_Ptr>0 && Compiled_Junctions_Ptr<=MAX_JUNCS_ALLOWED);
+				assert(TD.Compiled_Junctions_Ptr>0 && TD.Compiled_Junctions_Ptr<=MAX_JUNCS_ALLOWED);
 				return TRANCRIPT_END;
 			}
 
 			if(Junc_Count) 
 			{
-				Max_Junc_Found=Junc_Count;
+				TD.Max_Junc_Found=Junc_Count;
 			}
-			if(Least_Mis_In_Junc> Mis_In_Junc_Count) Least_Mis_In_Junc=Mis_In_Junc_Count; 
-			Transcript_Number++;
-			if(Max_Junc_Count<Junc_Count)//count max transcribed juncs..
-				Max_Junc_Count=Junc_Count;
+			if(TD.Least_Mis_In_Junc> Mis_In_Junc_Count) TD.Least_Mis_In_Junc=Mis_In_Junc_Count; 
+			TD.Transcript_Number++;
+			if(TD.Max_Junc_Count<Junc_Count)//count max transcribed juncs..
+				TD.Max_Junc_Count=Junc_Count;
 
-			if(Compiled_Junctions_Ptr+Junc_Count<= MAX_JUNCS_ALLOWED)
+			if(TD.Compiled_Junctions_Ptr+Junc_Count<= MAX_JUNCS_ALLOWED)
 			{
 				for(int i=0;i<Junc_Count;i++)
 				{
-					Trans_Array[i].Junc_Count=Junc_Count;Trans_Array[i].Label=Transcript_Number;Trans_Array[i].Sign=(Sign)? 1:0;Trans_Array[i].Mismatches=R.Mismatches;Compiled_Junctions[Compiled_Junctions_Ptr++]=Trans_Array[i];
+					//assert(Junc_Count<=2);
+					TD.Trans_Array[i].Junc_Count=Junc_Count;TD.Trans_Array[i].Label=TD.Transcript_Number;TD.Trans_Array[i].Sign=(Sign)? 1:0;TD.Trans_Array[i].Mismatches=R.Mismatches;TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr++]=TD.Trans_Array[i];
 				}
 			}
 			else
@@ -732,19 +742,19 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 				Err=1;
 			}
 
-			assert(Compiled_Junctions_Ptr>0 && Compiled_Junctions_Ptr<=MAX_JUNCS_ALLOWED);
+			assert(TD.Compiled_Junctions_Ptr>0 && TD.Compiled_Junctions_Ptr<=MAX_JUNCS_ALLOWED);
 			return TRANCRIPT_END;
 		}
 		else//End of the read may contain extra junc that cannot be processed..
 		{
-			if(Junc_Count && Least_Mis_In_Junc> Mis_In_Junc_Count) Least_Mis_In_Junc=Mis_In_Junc_Count; 
+			if(Junc_Count && TD.Least_Mis_In_Junc> Mis_In_Junc_Count) TD.Least_Mis_In_Junc=Mis_In_Junc_Count; 
 
 			int JC=(Junc_Count)? Junc_Count:1;//TODO
-			if(Partial_Junctions_Ptr+JC< MAX_JUNCS_ALLOWED)
+			if(TD.Partial_Junctions_Ptr+JC< MAX_JUNCS_ALLOWED)
 			{
 				for(int i=0;i<JC;i++)
 				{
-					Trans_Array[i].Junc_Count=Junc_Count;Trans_Array[i].Label=Transcript_Number;Trans_Array[i].Sign=(Sign)? 1:0;Trans_Array[i].Mismatches=R.Mismatches;Partial_Junctions[Partial_Junctions_Ptr++]=Trans_Array[i];
+					TD.Trans_Array[i].Junc_Count=Junc_Count;TD.Trans_Array[i].Label=TD.Transcript_Number;TD.Trans_Array[i].Sign=(Sign)? 1:0;TD.Trans_Array[i].Mismatches=R.Mismatches;TD.Partial_Junctions[TD.Partial_Junctions_Ptr++]=TD.Trans_Array[i];
 				}
 			}
 			else
@@ -752,20 +762,20 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 				Err=1;
 			}
 
-			assert(Partial_Junctions_Ptr>0 && Partial_Junctions_Ptr<=MAX_JUNCS_ALLOWED);
+			assert(TD.Partial_Junctions_Ptr>0 && TD.Partial_Junctions_Ptr<=MAX_JUNCS_ALLOWED);
 			return DUMMY_JUNC;
 		}
 	}
 
-	if(Align(S+Read_Skip,MINX,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip,R,Read_Skip+MINX,Read_Skip))//Can exact extension be done..
+	if(Align(S+Read_Skip,MINX,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip,R,Read_Skip+MINX,Read_Skip,TD))//Can exact extension be done..
 	{
-		std::vector <SARange> Hits(Generic_Hits.Hit_Array_Ptr);
-		for (int i=0;i<Generic_Hits.Hit_Array_Ptr;i++)//Save hits in a vector..
+		std::vector <SARange> Hits(TD.Generic_Hits.Hit_Array_Ptr);
+		for (int i=0;i<TD.Generic_Hits.Hit_Array_Ptr;i++)//Save hits in a vector..
 		{
-			assert(Generic_Hits.Hit_Array[i].Start);
-			Hits[i]=Generic_Hits.Hit_Array[i];
+			assert(TD.Generic_Hits.Hit_Array[i].Start);
+			Hits[i]=TD.Generic_Hits.Hit_Array[i];
 		}
-		unsigned Last_ExonT;int Hit_Count=Generic_Hits.Hit_Array_Ptr-1;
+		unsigned Last_ExonT;int Hit_Count=TD.Generic_Hits.Hit_Array_Ptr-1;
 		for (int i=0;i<=Hit_Count;i++)//Save hits in a vector..
 		{
 			SARange SA=Hits[i];
@@ -774,7 +784,8 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 			{
 				Last_ExonT=SA.Start-Read_Skip;
 			}
-			Seek_Junc(S,SA,Read_Skip+MINX,Junc_Count,Mis_In_Junc_Count,Last_ExonT,StringLength,Trans_Array_Ptr,Pre,Suf,Inspected_Pairs,Err,Sign);
+			Seek_Junc(S,SA,Read_Skip+MINX,Junc_Count,Mis_In_Junc_Count,Last_ExonT,StringLength,Trans_Array_Ptr,Pre,Suf,Inspected_Pairs,Err,Sign,TD);
+			if(Err) return 0;
 			if (Inspected_Pairs >= MAX_INSPECTED_PAIRS) {Err++;return 0;}
 		}
 	}
@@ -782,16 +793,17 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 //Junction check routines
 	if(Read_Skip>=MINX)
 	{
+		if(Exons_Too_Small(Trans_Array_Ptr,TD)) return 0;
 		//Case of a single junction between S[a,a+2l-1]
-		if (Junc_Count-1<Max_Junc_Found) //This will add one junction..
+		if (Junc_Count-1<TD.Max_Junc_Found) //This will add one junction..
 		{
 			//the junction is between S[Read_Skip,Read_Skip+18]
 			//so anchor S[Read_Skip-18,Read_Skip]
 			//Penguin S[Read_Skip-18,Read_Skip] ---- S[Read_Skip+18,Read_Skip+36] and extend..
-			Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX);
-			Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-6);
-			Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-12);
-			Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-15);
+			Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX,TD);
+			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-6,TD);
+			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-12,TD);
+			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-15,TD);
 		}
 	}
 
@@ -799,7 +811,7 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 
 }
 
-void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int StringLength, unsigned Anchor,int & Inspected_Pairs,SARange & R,int Junc_Count,int Mis_In_Junc_Count,int & Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int Skip,int & Err,int Sign,int Fragment)
+void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int StringLength, unsigned Anchor,int & Inspected_Pairs,SARange & R,int Junc_Count,int Mis_In_Junc_Count,int & Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int Skip,int & Err,int Sign,int Fragment,Transcript_Data & TD)
 {
 	assert(StringLength<=READLEN && Converted_Read && Read_Skip>=0 && StringLength >0);
 	char Read[200];
@@ -824,16 +836,17 @@ void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int
 			//printf("q-p: %d, fragment-2*minx: %d\n", int(q-p), Fragment-2*MINX);
 			if(int(q-p)<=(Fragment-2*MINX) || q<p) continue;
 			bool Junc_Already_Found=false;
-			for(int j=0;j<Compiled_Junctions_Ptr;j++) 
+			for(int j=0;j<TD.Compiled_Junctions_Ptr;j++) 
 			{
-				if(Compiled_Junctions[j].p==Final_Juncs[i].p && Compiled_Junctions[j].q==Final_Juncs[i].q && Compiled_Junctions[j].r==Final_Juncs[i].r )
+				if(TD.Compiled_Junctions[j].p==Final_Juncs[i].p && TD.Compiled_Junctions[j].q==Final_Juncs[i].q && TD.Compiled_Junctions[j].r==Final_Juncs[i].r )
 				{
 					Junc_Already_Found=true;break;
 				}
 			}
 			if(Junc_Already_Found) continue;
-			Trans_Array[Trans_Array_Ptr]=Final_Juncs[i];//.x=p;Trans_Array[Trans_Array_Ptr].y=q;
-			Seek_Junc(Converted_Read+r-Skip,R,0,Junc_Count+1,Mis_In_Junc_Count,q+1,StringLength-r,Trans_Array_Ptr+1,Pre,Suf,Inspected_Pairs,Err,Sign);
+			TD.Trans_Array[Trans_Array_Ptr]=Final_Juncs[i];//.x=p;Trans_Array[Trans_Array_Ptr].y=q;
+			Seek_Junc(Converted_Read+r-Skip,R,0,Junc_Count+1,Mis_In_Junc_Count,q+1,StringLength-r,Trans_Array_Ptr+1,Pre,Suf,Inspected_Pairs,Err,Sign,TD);
+			if(Err) break;
 			if (Inspected_Pairs >= MAX_INSPECTED_PAIRS) {Err++;break;}
 		}
 	}
@@ -841,24 +854,25 @@ void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int
 	delete [] Pairs;
 }
 
-int Seek_Single_Strand(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf,int Sign)
+int Seek_Single_Strand(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf,int Sign,Transcript_Data & TD)
 {
 	SARange SA;
 	SA.Start=0;SA.End=revfmi->textLength;
-	SA.Level=1; SA.Skip=0;SA.Mismatches=0;SA.Mismatch_Char=0;Generic_Hits.Hit_Array_Ptr=0;Generic_Hits.Current_Tag=Current_Tag;
+	SA.Level=1; SA.Skip=0;SA.Mismatches=0;SA.Mismatch_Char=0;TD.Generic_Hits.Hit_Array_Ptr=0;TD.Generic_Hits.Current_Tag=Current_Tag;
 
 	int Inspected_Pairs=0;
 	int Err=0;
-	Seek_Junc(Current_Tag,SA,0,0,0,UINT_MAX,StringLength,0,MF_Pre,MF_Suf,Inspected_Pairs,Err,Sign);
+	Seek_Junc(Current_Tag,SA,0,0,0,UINT_MAX,StringLength,0,MF_Pre,MF_Suf,Inspected_Pairs,Err,Sign,TD);
 	return Err;
 }
 
-int Seek_All_Junc(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf)
+int Seek_All_Junc(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf,Transcript_Data & TD)
 {
-	int Err= Seek_Single_Strand(Current_Tag,StringLength,MF_Pre,MF_Suf,1/*Plus*/);
+	int Err= Seek_Single_Strand(Current_Tag,StringLength,MF_Pre,MF_Suf,1/*Plus*/,TD);
+	if (Err) return Err;
 	char RC_Read[MAXDES],RC_Bin[MAXDES];
 	Convert_Reverse(Current_Tag,RC_Read,RC_Bin,StringLength);
-	Err+= Seek_Single_Strand(RC_Bin,StringLength,MF_Pre,MF_Suf,0/*Minus*/);
+	Err+= Seek_Single_Strand(RC_Bin,StringLength,MF_Pre,MF_Suf,0/*Minus*/,TD);
 	return Err;
 }
 
@@ -890,4 +904,18 @@ void Reset_MEMX(MEMX & M)
 	M.Two_Mismatches_At_End_Pointer=0;
 	M.Two_Mismatches_At_End_Forward_Pointer=0;
 	M.Hit_Array_Ptr=0;
+}
+
+bool Exons_Too_Small(int Trans_Array_Ptr,Transcript_Data & TD)
+{
+	int Count=0;
+	for(int i=0;i<Trans_Array_Ptr;i++)
+	{
+		if(TD.Trans_Array[i].r<=20) Count++;
+		if(TD.Trans_Array[i].r<=18) return true;
+	}
+	if(Count>1)
+		return true;
+	else
+		return false;
 }
