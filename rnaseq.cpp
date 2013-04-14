@@ -273,7 +273,7 @@ void *Map(void *T)
 		int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD);
 		TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
 
-		if(TD.Compiled_Junctions_Ptr && !(DEBUG && Err))
+		if((TD.Compiled_Junctions_Ptr) && !(DEBUG && Err))
 		{
 			int firstSignal = -2;
 			int tempType = Classify_Hits(TD.Compiled_Junctions,firstSignal);
@@ -290,7 +290,7 @@ void *Map(void *T)
 			}	
 			else 
 			{
-				assert(approvedPtr);
+				//assert(approvedPtr);
 				for(int i=0; i<approvedPtr; i++) {
 					Print_Hits(Head,TD.Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType,0,Err,Genome_Offsets);//tempType);
 				}
@@ -464,7 +464,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 			else if(dist>60) Junc_Score+=1;
 		}
 		int tempScore = -3*Final_Juncs[i].Mismatches+Junc_Score;//+Final_Juncs[i].score;
-		if(Final_Juncs[i].Junc_Count<=2 && tempScore >= max)
+		if(Final_Juncs[i].Junc_Count<=4 && tempScore >= max)
 		{
 			if(tempScore!=max) ptr = 0;
 			max = tempScore;
@@ -473,7 +473,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 		}
 
 	}
-	assert(ptr);
+	//assert(ptr);
 	return ptr;
 }
 
@@ -719,7 +719,7 @@ bool Align(char* Source,int StringLength,unsigned Dest_Loc,SARange & R,int Actua
 	}	
 	else
 	{
-		Reset_MEMX(TD.Generic_Hits);TD.Generic_Hits.Hit_Array_Ptr=0;R.Level=1;R.FMIndex=REVERSE;
+		Reset_MEMX(TD.Generic_Hits);TD.Generic_Hits.Hit_Array_Ptr=0;R.Level=1;TD.Generic_Hits.FMIndex=REVERSE;
 		int T_Len=TD.Generic_Hits.L.STRINGLENGTH;TD.Generic_Hits.L.STRINGLENGTH=Actual_Length;
 		int Lo=0;
 		Extend_Forwards(Source,R,/*MAX_MISMATCHES*/MIS_DENSITY,1,StringLength,INT_MAX,revfmi,TD.Generic_Hits,true,Read_Skip,Lo);
@@ -926,7 +926,7 @@ void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int
 int Seek_Single_Strand(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf,int Sign,Transcript_Data & TD)
 {
 	SARange SA;
-	SA.Start=0;SA.End=revfmi->textLength;SA.FMIndex=REVERSE;
+	SA.Start=0;SA.End=revfmi->textLength;//SA.FMIndex=REVERSE;
 	SA.Level=1; SA.Skip=0;SA.Mismatches=0;SA.Mismatch_Char=0;Reset_MEMX(TD.Generic_Hits);TD.Generic_Hits.Hit_Array_Ptr=0;TD.Generic_Hits.Current_Tag=Current_Tag;
 
 	int Inspected_Pairs=0;
