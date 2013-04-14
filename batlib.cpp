@@ -4250,6 +4250,7 @@ void Extend_Forwards(const char* Current_Tag,const struct SARange & Tag,int Coun
 	Start=Start-2;//Adjust for offset difference
 	int FSStack_Top=0;
 	M.FSSStack[0]=Tag;
+	assert(Tag.FMIndex==FORWARD || Tag.FMIndex==REVERSE);
 	SARange Branch_Ranges[4];
 	struct SARange Range,Temp_Range;
 
@@ -4291,6 +4292,7 @@ void Extend_Forwards(const char* Current_Tag,const struct SARange & Tag,int Coun
 							{
 								Lo_Count=M.Hit_Array_Ptr;
 							}
+							assert(Temp_Range.FMIndex==FORWARD || Temp_Range.FMIndex==REVERSE);
 							Print_LocationX(Temp_Range,M);
 							if (MAXHITS<=M.Hits) return;
 						}
@@ -4357,6 +4359,7 @@ void Extend_Forwards_OneSA(const char* Current_Tag,struct SARange & Tag,int Coun
 				{
 					Lo_Count=M.Hit_Array_Ptr;
 				}
+				assert(Tag.FMIndex==FORWARD || Tag.FMIndex==REVERSE);
 				Print_LocationX(Tag,M);
 				return;
 			}

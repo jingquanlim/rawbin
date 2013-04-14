@@ -8,7 +8,7 @@
 #include <string>
 #include <limits.h>
 #include <inttypes.h>
-#include <string.h>
+#include <string>
 #include <stdlib.h>
 #include <xmmintrin.h>
 #include <emmintrin.h>
@@ -28,6 +28,8 @@
 #include "init.h"
 #include <vector> 
 #include <math.h>
+#include <pthread.h>
+#include "sched.h" 
 extern "C" 
 {
 	#include "iniparser.h"
@@ -86,8 +88,8 @@ unsigned Location_Array[80];
 unsigned char* Original_Text;
 char Char_To_CodeC[256];
 char Char_To_Code[256];
-Offset_Record Genome_Offsets[80];
 unsigned Offsets[80];
+Offset_Record Genome_Offsets_Main[80];
 int ORG_STRINGLENGTH;
 
 unsigned RQ_Hits;
@@ -97,6 +99,18 @@ char COMPRESS;
 
 float Donor_Prob[16][64][2];
 float Acc_Prob[16][64][2];
+Parameters CL;	
+Index_Info Genome_Files;
+MMPool *mmPool;
+RANGEINDEX Range_Index;
+unsigned SOURCELENGTH;
+gzFile Input_File,Mate_File;
+FILETYPE File_Info;
+
+int THREAD = 0;
+pthread_mutex_t lock;
+pthread_mutex_t fillProbArraylock;
+pthread_mutex_t OpenGenomeFileslock;
 //}---------------------------- GLOBAL VARIABLES -------------------------------------------------
 
 struct Transcript_Data
@@ -136,55 +150,98 @@ void fillProbArray(float prob[16][64][2], string filename);
 int getBest(char* Current_Tag,int StringLength,Junction * Compiled_Junctions, int * approved, bool print);
 void Reset_MEMX(MEMX & M);
 bool Exons_Too_Small(int Trans_Array_Ptr,Transcript_Data & TD);
+void *Map(void *T);
+void Join_Tables(Offset_Record *Genome_Offsets,int Thread_ID);
+void Launch_Threads(int NTHREAD, void* (*Map_t)(void*),Thread_Arg T);
+void Set_Affinity();
 //}-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 
 int main(int argc, char* argv[])
 {
+	time_t Start_Time,End_Time,Maptime;
+	time(&Start_Time);
+	if ((pthread_mutex_init(&lock, NULL) != 0) ||(pthread_mutex_init(&fillProbArraylock, NULL) != 0)||(pthread_mutex_init(&OpenGenomeFileslock, NULL) != 0))
+	{
+		printf("\n mutex init failed\n");
+		return 1;
+	}
 
+	Parse_Command_line(argc,argv,Genome_Files,CL);
+	Load_All_Indexes(Genome_Files,fwfmi,revfmi,mmPool,Range_Index);
+	Print_SAM_Header(Annotations,argc,argv,CL.PATTERNFILE);
+	Init(revfmi,SOURCELENGTH,Input_File,Mate_File,File_Info,CL,Genome_Files);
+	Open_Genome_Files(Genome_Files.LOCATIONFILE,Genome_Offsets_Main,Offsets);
+	Conversion_Factor=revfmi->textLength-RQFACTOR;
+
+	Thread_Arg T;
+	if (THREAD)
+	{
+		Launch_Threads(THREAD, Map,T);
+	}
+	else
+	{
+		Set_Affinity();
+		Map(NULL);
+	}
+	//Map(NULL);
+
+	UnLoad_Indexes(fwfmi,revfmi,mmPool,Range_Index);
+	fprintf(stderr,"\r[++++++++100%%+++++++++]\n");//progress bar....
+	time(&End_Time);
+	Maptime=difftime(End_Time,Start_Time);
+
+	char Junction_File[]="junctions.bed";
+	Print_Junctions(Junction_File,Genome_Offsets_Main);
+	time(&End_Time);fprintf(stderr,"\n Time Taken  - %.0lf Seconds ..\n ",(float)difftime(End_Time,Start_Time));
+	fprintf(stderr,"\n Time Taken  - %.0lf Seconds ..\n ",float(Maptime));
+	return 0;
+}
+
+
+void *Map(void *T)
+{
+	Thread_Arg *TA;
+	TA=(Thread_Arg*) T;
+	int Thread_ID;
+	if(THREAD==0 || THREAD==1) {Thread_ID=1;}
+	if(T)
+	{
+		Thread_ID=TA->ThreadID;
+	}
+	char Str_Thread_ID[20];sprintf(Str_Thread_ID,".%d",Thread_ID);
 	Transcript_Data TD;
 	unsigned Total_Hits=0,Tags_Processed=0,Tag_Count=0;
-	time_t Start_Time,End_Time;
 	unsigned Number_of_Tags=1000;
 	unsigned Progress=0;
 	unsigned Hit_ID=0;
 	FILE* OUT;
+	Offset_Record Genome_Offsets[80];
 
 //------------------- INIT -------------------------------------------------------------
-	Index_Info Genome_Files;
-	Parameters CL;	
-	MMPool *mmPool;
-	RANGEINDEX Range_Index;
-	unsigned SOURCELENGTH;
 	ofstream SAM[4];
-	string SAMFiles[] = {"unique_signal.sam","unique_nosignal.sam",/*"mishits.fq",*/"nonunique_onesignal.sam","others.sam"};
+	string SAMFiles[] = {"unique_signal","unique_nosignal",/*"mishits.fq",*/"nonunique_onesignal","others"};
 	PAIR *Pairs;
 	//Junction Final_Juncs[2*MAX_JUNCS_TO_STORE+2];
-	gzFile Input_File,Mate_File;
-	FILETYPE File_Info;
 
-	Parse_Command_line(argc,argv,Genome_Files,CL);
-	Load_All_Indexes(Genome_Files,fwfmi,revfmi,mmPool,Range_Index);
-	Init(revfmi,SOURCELENGTH,Pairs,Input_File,Mate_File,File_Info,CL,OUT,Genome_Files);
+	if (!(Pairs=(PAIR*)malloc(sizeof(PAIR)*(MAX_HITS_TO_STORE+10)))) {fprintf(stderr,"Allocate_Memory():malloc error...\n");exit(100);}
+	if (CL.JUNCTIONFILE) OUT=File_Open(CL.JUNCTIONFILE,"w"); else OUT=stdout;
 	Open_Genome_Files(Genome_Files.LOCATIONFILE,Genome_Offsets,Offsets);
 	for(int i=0;i<4;i++)
 	{
-		Open_Outputs(SAM[i],SAMFiles[i]);
+		Open_Outputs(SAM[i],SAMFiles[i]+Str_Thread_ID+".sam");
 	}
 	ofstream rejectedSAM;
-	string rejectedSAMFile = "rejected.sam";
-	Open_Outputs(rejectedSAM, rejectedSAMFile);
+	string rejectedSAMFile = "rejected";
+	Open_Outputs(rejectedSAM, rejectedSAMFile+Str_Thread_ID+".sam");
 	
-	Print_SAM_Header(Annotations,argc,argv,CL.PATTERNFILE);
 //------------------- INIT -------------------------------------------------------------
 
-	time(&Start_Time);
 	READ Head,Tail;
 	int LOOKUPSIZE=3;
 	MEMLOOK MLook;MLook.Lookupsize=3;
 	Build_Tables(fwfmi,revfmi,MLook);
 	LEN L;L.IGNOREHEAD=0;
 	Split_Read(RQFACTOR,L);//we are scanning 18-mers...
-	Conversion_Factor=revfmi->textLength-RQFACTOR;
 //--------------------- Setup Data Structure for Batman Prefix ----------------------------------------
 	MEMX MF_Pre,MF_Suf;//MemX is the data structure for doing Batman alignment. MF_Pre is for the prefix, MC for suffix..
 	Init_Batman(MF_Pre,L,MLook,MAX_MISMATCHES);
@@ -196,67 +253,79 @@ int main(int argc, char* argv[])
 //--------------------- Load probability information --------------------------
 	Init_Prob();
 
-	time_t Maptime;
+	fprintf(stderr,"======================]\r[");//progress bar....
+	int Actual_Tag=0;
+	int selectedJunctions[MAX_JUNCS_ALLOWED+1];
+	while (Read_Tag(Head,Tail,Input_File,Mate_File,File_Info))
 	{
-		fprintf(stderr,"======================]\r[");//progress bar....
-		int Actual_Tag=0;
-		int selectedJunctions[MAX_JUNCS_ALLOWED+1];
-		while (Read_Tag(Head,Tail,Input_File,Mate_File,File_Info))
+		if(Thread_ID==1 && !Progress_Bar(CL,Number_of_Tags,Progress,Tag_Count,File_Info)) break;
+		if(CL.MAX_TAGS_TO_PROCESS && CL.MAX_TAGS_TO_PROCESS<Actual_Tag) break;
+
+		int Label=0;
+		Actual_Tag++;
+
+		TD.Max_Junc_Found=INT_MAX;
+		TD.Least_Mis_In_Junc=INT_MAX;
+		TD.Compiled_Junctions_Ptr=0;
+		TD.Partial_Junctions_Ptr=0;
+		TD.Transcript_Number=0;
+		TD.Max_Junc_Count=0;
+		int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD);
+		TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
+
+		if(TD.Compiled_Junctions_Ptr && !(DEBUG && Err))
 		{
-			if(!Progress_Bar(CL,Number_of_Tags,Progress,Tag_Count,File_Info)) break;
-			if(CL.MAX_TAGS_TO_PROCESS && CL.MAX_TAGS_TO_PROCESS<Actual_Tag) break;
+			int firstSignal = -2;
+			int tempType = Classify_Hits(TD.Compiled_Junctions,firstSignal);
+			int approvedPtr;
+			approvedPtr = getBest(Head.Tag,File_Info.STRINGLENGTH,TD.Compiled_Junctions, selectedJunctions, true);
 
-			int Label=0;
-			Actual_Tag++;
-
-			TD.Max_Junc_Found=INT_MAX;
-			TD.Least_Mis_In_Junc=INT_MAX;
-			TD.Compiled_Junctions_Ptr=0;
-			TD.Partial_Junctions_Ptr=0;
-			TD.Transcript_Number=0;
-			TD.Max_Junc_Count=0;
-			int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD);
-			TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
-
-			if(TD.Compiled_Junctions_Ptr && !(DEBUG && Err))
+			if(approvedPtr > 1) 
 			{
-				int firstSignal = -2;
-				int tempType = Classify_Hits(TD.Compiled_Junctions,firstSignal);
-				int approvedPtr;
-				approvedPtr = getBest(Head.Tag,File_Info.STRINGLENGTH,TD.Compiled_Junctions, selectedJunctions, true);
-				
-				if(approvedPtr > 1) 
+				Hit_ID++;
+				for(int i=0; i<approvedPtr; i++) 
 				{
-					Hit_ID++;
-					for(int i=0; i<approvedPtr; i++) 
-					{
-						Print_Hits(Head,TD.Compiled_Junctions,OUT,rejectedSAM,Tag_Count,selectedJunctions[i],tempType,Hit_ID,Err);//tempType);
-					}
-				}	
-				else 
-				{
-					assert(approvedPtr);
-					for(int i=0; i<approvedPtr; i++) {
-						Print_Hits(Head,TD.Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType,0,Err);//tempType);
-					}
+					Print_Hits(Head,TD.Compiled_Junctions,OUT,rejectedSAM,Tag_Count,selectedJunctions[i],tempType,Hit_ID,Err,Genome_Offsets);//tempType);
 				}
-
+			}	
+			else 
+			{
+				//assert(approvedPtr);
+				for(int i=0; i<approvedPtr; i++) {
+					Print_Hits(Head,TD.Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType,0,Err,Genome_Offsets);//tempType);
+				}
 			}
+
 		}
-		UnLoad_Indexes(fwfmi,revfmi,mmPool,Range_Index);
-		fprintf(stderr,"\r[++++++++100%%+++++++++]\n");//progress bar....
-		time(&End_Time);
-		Maptime=difftime(End_Time,Start_Time);
-
-		char Junction_File[]="junctions.bed";
-		Print_Junctions(Junction_File);
-
 	}
-	/*printf("Average %d\n",Sum);*/
-	fprintf(stderr,"%u / %u Tags/Hits",Tag_Count,Total_Hits);
-	time(&End_Time);fprintf(stderr,"\n Time Taken  - %.0lf Seconds ..\n ",(float)difftime(End_Time,Start_Time));
-	fprintf(stderr,"\n Time Taken  - %.0lf Seconds ..\n ",float(Maptime));
-	return 0;
+	Join_Tables(Genome_Offsets,Thread_ID);
+
+}
+
+void Join_Tables(Offset_Record *Genome_Offsets,int Thread_ID)
+{
+	pthread_mutex_lock(&lock);
+	cout <<"Joining junctions from Thread " << Thread_ID<<endl; 
+
+	for(int i=0;Genome_Offsets[i].Offset !=INT_MAX;i++)
+	{
+		OP JPair;
+		JStat JStat;
+		Junction J;
+
+		Hash *Junctions=Genome_Offsets[i].Junc_Hash,*Main=Genome_Offsets_Main[i].Junc_Hash;
+		char Junc_Not_Empty = Junctions->Init_Iterate(JPair,JStat);
+
+		while (Junc_Not_Empty)
+		{
+
+			J.Type=JStat.Junc_Type;
+			Main->Insert(JPair,J,JStat.Unique);
+			Junc_Not_Empty=Junctions->Iterate(JPair,JStat);
+		}
+	}
+	cout <<"Done.."<<endl;
+	pthread_mutex_unlock(&lock);
 }
 
 /* 
@@ -395,7 +464,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 			else if(dist>60) Junc_Score+=1;
 		}
 		int tempScore = -3*Final_Juncs[i].Mismatches+Junc_Score;//+Final_Juncs[i].score;
-		if(Final_Juncs[i].Junc_Count<=2 && tempScore >= max)
+		if(Final_Juncs[i].Junc_Count<=4 && tempScore >= max)
 		{
 			if(tempScore!=max) ptr = 0;
 			max = tempScore;
@@ -404,7 +473,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 		}
 
 	}
-	assert(ptr);
+	//assert(ptr);
 	return ptr;
 }
 
@@ -595,8 +664,8 @@ int Find_Pairings(int & Pairs_Index,SARange* MF_Pre_Hits,SARange* MF_Suf_Hits,PA
 					junctions[i].Sign=Sign;
 					junctions[i].ID=A.ID;
 
-					FILE* F=Genome_Offsets[A.ID].Out_File;
-					fwrite(&S,sizeof(Split_Map),1,F);
+					/*FILE* F=Genome_Offsets[A.ID].Out_File;
+					fwrite(&S,sizeof(Split_Map),1,F);*/
 
 					//if(S.q!=S.p-1)//not an exact match?
 					{
@@ -650,7 +719,7 @@ bool Align(char* Source,int StringLength,unsigned Dest_Loc,SARange & R,int Actua
 	}	
 	else
 	{
-		TD.Generic_Hits.Hit_Array_Ptr=0;R.Level=1;
+		Reset_MEMX(TD.Generic_Hits);TD.Generic_Hits.Hit_Array_Ptr=0;R.Level=1;R.FMIndex=REVERSE;
 		int T_Len=TD.Generic_Hits.L.STRINGLENGTH;TD.Generic_Hits.L.STRINGLENGTH=Actual_Length;
 		int Lo=0;
 		Extend_Forwards(Source,R,/*MAX_MISMATCHES*/MIS_DENSITY,1,StringLength,INT_MAX,revfmi,TD.Generic_Hits,true,Read_Skip,Lo);
@@ -857,8 +926,8 @@ void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int
 int Seek_Single_Strand(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf,int Sign,Transcript_Data & TD)
 {
 	SARange SA;
-	SA.Start=0;SA.End=revfmi->textLength;
-	SA.Level=1; SA.Skip=0;SA.Mismatches=0;SA.Mismatch_Char=0;TD.Generic_Hits.Hit_Array_Ptr=0;TD.Generic_Hits.Current_Tag=Current_Tag;
+	SA.Start=0;SA.End=revfmi->textLength;SA.FMIndex=REVERSE;
+	SA.Level=1; SA.Skip=0;SA.Mismatches=0;SA.Mismatch_Char=0;Reset_MEMX(TD.Generic_Hits);TD.Generic_Hits.Hit_Array_Ptr=0;TD.Generic_Hits.Current_Tag=Current_Tag;
 
 	int Inspected_Pairs=0;
 	int Err=0;
@@ -878,6 +947,7 @@ int Seek_All_Junc(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf
 
 void fillProbArray(float prob[16][64][2], string filename) {
 	ifstream in;
+	pthread_mutex_lock(&fillProbArraylock);
 	in.open(filename.c_str());
 	for(int i=0;i<16;i++) {
 		for(int j=0;j<64;j++) {
@@ -886,6 +956,7 @@ void fillProbArray(float prob[16][64][2], string filename) {
 		}
 	}
 	in.close();
+	pthread_mutex_unlock(&fillProbArraylock);
 }
 
 void Init_Prob() {
@@ -904,6 +975,7 @@ void Reset_MEMX(MEMX & M)
 	M.Two_Mismatches_At_End_Pointer=0;
 	M.Two_Mismatches_At_End_Forward_Pointer=0;
 	M.Hit_Array_Ptr=0;
+	M.Hits=0;
 }
 
 bool Exons_Too_Small(int Trans_Array_Ptr,Transcript_Data & TD)
@@ -918,4 +990,59 @@ bool Exons_Too_Small(int Trans_Array_Ptr,Transcript_Data & TD)
 		return true;
 	else
 		return false;
+}
+
+
+void Launch_Threads(int NTHREAD, void* (*Map_t)(void*),Thread_Arg T)
+{
+	Threading* Thread_Info=(Threading*) malloc(sizeof(Threading)*NTHREAD);
+	int Thread_Num=0;
+	pthread_attr_t Attrib;
+	pthread_attr_init(&Attrib);
+	pthread_attr_setdetachstate(&Attrib, PTHREAD_CREATE_JOINABLE);
+
+	for (int i=0;i<NTHREAD;i++)
+	{
+		T.ThreadID=i;
+		Thread_Info[i].Arg=T;
+		//if(!(Thread_Info[i].r=pthread_create(&Thread_Info[i].Thread,NULL,Map_t,(void*) &Thread_Info[i].Arg))) Thread_Num++;
+		Thread_Info[i].r=pthread_create(&Thread_Info[i].Thread,&Attrib,Map_t,(void*) &Thread_Info[i].Arg);
+		if(Thread_Info[i].r) {printf("Launch_Threads():Cannot create thread..\n");exit(-1);} else Thread_Num++;
+	}
+	printf("%d Threads runnning ...\n",Thread_Num);
+	pthread_attr_destroy(&Attrib);
+
+	for (int i=0;i<NTHREAD;i++)
+	{
+		pthread_join(Thread_Info[i].Thread,NULL);
+	}
+}
+
+void Set_Affinity()
+{
+	cpu_set_t Set;
+	CPU_ZERO(&Set);
+
+	if(sched_getaffinity(0,sizeof(cpu_set_t),&Set)<0)
+	{
+		printf("Affinity could not be get..\n");
+	}
+	else
+	{
+		for (int i=0;i<CPU_SETSIZE;i++)
+		{
+			if(CPU_ISSET(i,&Set))
+			{
+				printf("Bound to %d\n",i);
+				CPU_ZERO(&Set);
+				CPU_SET(i, &Set);
+				if(sched_setaffinity(0, sizeof(Set), &Set)<0)
+				{
+					printf("Affinity could not be set..\n");
+				}
+				return;
+			}
+		}
+	}
+
 }

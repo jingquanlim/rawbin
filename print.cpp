@@ -3,7 +3,7 @@ extern int READLEN;
 extern const int UNIQUE_SIGNAL;//there is one junction, it has a signal
 extern const int UNIQUE_NOSIGNAL;//There is one junction, it does not have a signal..
 extern const int NON_UNIQUE_SIGNAL;//There are many local junctions, but only one have a signal..
-extern Offset_Record Genome_Offsets[];
+//extern Offset_Record Genome_Offsets[];
 
 void Open_Outputs(ofstream & SAM,string filename)
 {
@@ -27,7 +27,7 @@ inline char* Nullify_String(char* S)
 	return Strend;
 }
 
-void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int Tag_Count, int firstSignal,int Junc_Type,unsigned Hit_ID,int Err)
+void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int Tag_Count, int firstSignal,int Junc_Type,unsigned Hit_ID,int Err,Offset_Record *Genome_Offsets)
 {
 	//fprintf(OUT,"%s",Head.Description);  
 	Nullify_String(Head.Description+1);
@@ -126,7 +126,7 @@ void Print_SAM_Header(std::map <unsigned, Ann_Info> Annotations,int argc,char* a
 }
 
 
-void Print_Junctions(char* Junction_File)
+void Print_Junctions(char* Junction_File,Offset_Record *Genome_Offsets)
 {
 	static char NOHEADER=TRUE;
 	ofstream JUNCFILE;

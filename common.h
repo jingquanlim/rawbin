@@ -7,8 +7,8 @@
 #define SINGLE_END 1
 #define PAIRED_END 2
 #define MAX_MISMATCHES_BOUND 16
-#define REVERSE 1
-#define FORWARD 0
+#define REVERSE 11
+#define FORWARD 10
 #define SAINTERVAL 8
 #define BRANCHTHRESHOLD 0//80 //30 //Threshold at which to check the BWT instead of branching
 #define PAIREND 2
@@ -51,13 +51,13 @@ struct Offset_Record
 	char Genome[40];
 	char GenomeM[40];
 	unsigned Offset;
-	FILE* Out_File;
+	/*FILE* Out_File;
 	FILE* Out_FileM;
 	FILE* Unmapped;
 	FILE* UnmappedX;
 	FILE* UnmappedM;
 	FILE* UnmappedXM;
-	FILE* Ref_File;
+	FILE* Ref_File;*/
 	Hash*  Junc_Hash;
 };
 

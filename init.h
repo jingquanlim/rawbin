@@ -25,8 +25,9 @@
 #include "Indexes.h"
 #include "file.h"
 #include "extend.h"
+#include <pthread.h>
 
-void Init(BWT *revfmi,unsigned & SOURCELENGTH,PAIR* & Pairs,gzFile & Input_File,gzFile & Mate_File,FILETYPE & File_Info,Parameters & CL,FILE* & OUT,Index_Info & Genome_Files);
+void Init(BWT *revfmi,unsigned & SOURCELENGTH,gzFile & Input_File,gzFile & Mate_File,FILETYPE & File_Info,Parameters & CL,Index_Info & Genome_Files);
 bool  Progress_Bar(Parameters & CL,unsigned & Number_of_Tags,unsigned & Progress,unsigned & Tag_Count,FILETYPE & File_Info);
 void Load_All_Indexes(Index_Info Genome_Files,BWT* & fwfmi,BWT* & revfmi,MMPool* & mmPool,RANGEINDEX & Range_Index);
 int Open_Genome_Files(char* LOCATIONFILE,Offset_Record* Genome_Offsets,unsigned Offsets[]);

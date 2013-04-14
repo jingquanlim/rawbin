@@ -4,6 +4,7 @@
 #include "string.h"
 #include "const.h"
 #define FALSE 0
+extern int THREAD;
 option Long_Options[]=
 {
 {"help",0,NULL,'h'},
@@ -15,7 +16,7 @@ option Long_Options[]=
 void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 {
 	int Current_Option=0;
-	char Short_Options[] ="jM:bhq:t:g:G:n:N:o:w:mprO::";//allowed options....
+	char Short_Options[] ="jM:bhq:t:g:G:n:N:o:w:mprO::T:";//allowed options....
 	char* This_Program = argv[0];//Current program name....
 	char Help_String[]=
 "Parameters:\n"
@@ -49,6 +50,9 @@ void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 		{
 			case 'h':
 				printf("%s \n",Help_String);exit(0);
+			case 'T':
+				THREAD=atoi(optarg);
+				break;
 			case 't':
 				CL.MAX_TAGS_TO_PROCESS=atoi(optarg);
 				break;

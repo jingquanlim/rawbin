@@ -11,8 +11,9 @@ extern char COMPRESS;
 extern int *SA_Blocks;
 extern std::map <unsigned, Ann_Info> Annotations;
 extern unsigned Location_Array[80];
+extern pthread_mutex_t OpenGenomeFileslock;
 
-void Init(BWT *revfmi,unsigned & SOURCELENGTH,PAIR* & Pairs,gzFile & Input_File,gzFile & Mate_File,FILETYPE & File_Info,Parameters & CL,FILE* & OUT,Index_Info & Genome_Files)
+void Init(BWT *revfmi,unsigned & SOURCELENGTH,gzFile & Input_File,gzFile & Mate_File,FILETYPE & File_Info,Parameters & CL,Index_Info & Genome_Files)
 {
 	EXONGAP=CL.EXONGAP;
 	SOURCELENGTH = revfmi->textLength;
@@ -26,10 +27,8 @@ void Init(BWT *revfmi,unsigned & SOURCELENGTH,PAIR* & Pairs,gzFile & Input_File,
 	Char_To_CodeC['a']=3;Char_To_CodeC['c']=2;Char_To_CodeC['g']=1;Char_To_CodeC['t']=0;
 	Char_To_CodeC['-']='-';Char_To_CodeC['+']='+';//we are using character count to store the fmicode for acgt
 
-	if (!(Pairs=(PAIR*)malloc(sizeof(PAIR)*(MAX_HITS_TO_STORE+10)))) {fprintf(stderr,"Allocate_Memory():malloc error...\n");exit(100);}
 	Open_Files(Input_File,Mate_File,CL);
 	Detect_Input(File_Info,Input_File,Mate_File);
-	if (CL.JUNCTIONFILE) OUT=File_Open(CL.JUNCTIONFILE,"w"); else OUT=stdout;
 	FILE* Inf_File;
 	if((Inf_File=File_Exist_Open(Genome_Files.INFOFILE)))
 	{
@@ -101,14 +100,15 @@ void Load_All_Indexes(Index_Info Genome_Files,BWT* & fwfmi,BWT* & revfmi,MMPool*
  */
 int Open_Genome_Files(char* LOCATIONFILE,Offset_Record* Genome_Offsets,unsigned Offsets[])
 {
+	pthread_mutex_lock(&OpenGenomeFileslock);
 	FILE* Location_File=File_Open(LOCATIONFILE,"r");
 	int Genome_Count=0;
 
-	if(mkdir("Raw_Out",S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) && errno != EEXIST) 
+	/*if(mkdir("Raw_Out",S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) && errno != EEXIST) 
 	{
 		printf("Open_Genome_Files():Cannot create Temp directory..\n");
 		exit(-1);
-	}
+	}*/
 
 	while (fgets(Genome_Offsets[Genome_Count].Genome,39,Location_File)!=0 && Genome_Count<80)
 	{
@@ -129,18 +129,19 @@ int Open_Genome_Files(char* LOCATIONFILE,Offset_Record* Genome_Offsets,unsigned 
 		//else Genome_Offsets[Genome_Count].Out_File=File_Open(Genome_Offsets[Genome_Count].Genome,"r");
 		Genome_Count++;	
 	}
+	fclose(Location_File);
 	for ( int i=1;i<Genome_Count;i++)
 	{
 		Offsets[i]=Offsets[i-1]+Genome_Offsets[i].Offset;
 		//if(MAPMODE) 
 		{
 			Genome_Offsets[i-1].Junc_Hash=new Hash;
-			string S=Genome_Offsets[i-1].Genome;S="Raw_Out/"+S;Genome_Offsets[i-1].Out_File=File_Open(S.c_str(),"w+b");
+			/*string S=Genome_Offsets[i-1].Genome;S="Raw_Out/"+S;Genome_Offsets[i-1].Out_File=File_Open(S.c_str(),"w+b");
 			S=Genome_Offsets[i-1].GenomeM;S="Raw_Out/"+S;Genome_Offsets[i-1].Out_FileM=File_Open(S.c_str(),"w+b");
 			S=Genome_Offsets[i-1].Genome;S="Raw_Out/"+S+".U";Genome_Offsets[i-1].Unmapped=File_Open(S.c_str(),"w+b");
 			S=Genome_Offsets[i-1].GenomeM;S="Raw_Out/"+S+".U";Genome_Offsets[i-1].UnmappedM=File_Open(S.c_str(),"w+b");
 			S=Genome_Offsets[i-1].Genome;S="Raw_Out/"+S+".UX";Genome_Offsets[i-1].UnmappedX=File_Open(S.c_str(),"w+b");
-			S=Genome_Offsets[i-1].GenomeM;S="Raw_Out/"+S+".UX";Genome_Offsets[i-1].UnmappedXM=File_Open(S.c_str(),"w+b");
+			S=Genome_Offsets[i-1].GenomeM;S="Raw_Out/"+S+".UX";Genome_Offsets[i-1].UnmappedXM=File_Open(S.c_str(),"w+b");*/
 			
 		}
 		/*else
@@ -159,5 +160,6 @@ int Open_Genome_Files(char* LOCATIONFILE,Offset_Record* Genome_Offsets,unsigned 
 		}*/
 	}
 	Genome_Offsets[Genome_Count-1].Offset=INT_MAX;
+	pthread_mutex_unlock(&OpenGenomeFileslock);
 	return Genome_Count-1;
 }

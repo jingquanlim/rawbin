@@ -122,6 +122,8 @@ void Detect_Input(FILETYPE & P, gzFile Input_File,gzFile Mate_File)
 
 char Read_Tag(READ & Head,READ & Tail,gzFile Input_File,gzFile Mate_File,FILETYPE & F)
 {
+	gz_stream *s=(gz_stream*)Input_File;
+	flockfile(s->file);
 	char * Current_Tag;
 	static int Random_Pointer=0;
 
@@ -154,8 +156,18 @@ char Read_Tag(READ & Head,READ & Tail,gzFile Input_File,gzFile Mate_File,FILETYP
 		}
 		Current_Tag[F.STRINGLENGTH]='+';
 		Head.Complement[F.STRINGLENGTH]='-';
-	} else return FALSE;
-	if(F.NORMAL_TAGS) return TRUE;
+	} 
+	else 
+	{
+		funlockfile(s->file);
+		return FALSE;
+	}
+	if(F.NORMAL_TAGS) 
+	{
+		funlockfile(s->file);
+		return TRUE;
+	}
+	
 
 	Current_Tag=Tail.Tag;
 	if (gzgets(Mate_File,Tail.Description,MAXDES)!=0)// read a tag...
