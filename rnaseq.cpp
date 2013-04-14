@@ -290,7 +290,7 @@ void *Map(void *T)
 			}	
 			else 
 			{
-				//assert(approvedPtr);
+				assert(approvedPtr);
 				for(int i=0; i<approvedPtr; i++) {
 					Print_Hits(Head,TD.Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType,0,Err,Genome_Offsets);//tempType);
 				}
@@ -464,7 +464,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 			else if(dist>60) Junc_Score+=1;
 		}
 		int tempScore = -3*Final_Juncs[i].Mismatches+Junc_Score;//+Final_Juncs[i].score;
-		if(Final_Juncs[i].Junc_Count<=4 && tempScore >= max)
+		if(Final_Juncs[i].Junc_Count<=2 && tempScore >= max)
 		{
 			if(tempScore!=max) ptr = 0;
 			max = tempScore;
@@ -473,7 +473,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 		}
 
 	}
-	//assert(ptr);
+	assert(ptr);
 	return ptr;
 }
 
