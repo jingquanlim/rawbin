@@ -26,7 +26,7 @@ int Canonical_Score(char* signal)
 	}	
 	else if(!strcmp(signal, "GCAG") || !strcmp(signal, "CTGC"))
 	{
-		return 2;
+		return 1;
 	}	
 	else if(!strcmp(signal, "ATAC") || !strcmp(signal, "GTAT"))
 	{

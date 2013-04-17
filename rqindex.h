@@ -30,6 +30,7 @@ struct TAG_INFO
 };
 
 int Scan(MEMX & MF,int MAX_MISMATCHES, LEN & L,BWT* fwfmi,BWT* revfmi,int Next_Mis,int Max_Hits);
+int Scan_Both(MEMX & MF,MEMX & MC,int MAX_MISMATCHES, LEN & L,BWT* fwfmi,BWT* revfmi,int Next_Mis,int Max_Hits);
 unsigned log2(unsigned v); // 32-bit word to find the log of
 unsigned Get_Block_Start(unsigned SAValue,unsigned & M);
 void Load_Info( TAG_INFO & Tag, SARange & Head);

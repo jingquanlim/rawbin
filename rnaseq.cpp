@@ -242,14 +242,20 @@ void *Map(void *T)
 	READ Head,Tail;
 	int LOOKUPSIZE=3;
 	MEMLOOK MLook;MLook.Lookupsize=3;
+	MEMLOOK MLook_Long;MLook_Long.Lookupsize=6;
 	Build_Tables(fwfmi,revfmi,MLook);
-	LEN L;L.IGNOREHEAD=0;
+	Build_Tables(fwfmi,revfmi,MLook_Long);
+	LEN L,L_Long;L.IGNOREHEAD=L_Long.IGNOREHEAD=0;
 	Split_Read(RQFACTOR,L);//we are scanning 18-mers...
+	Split_Read(File_Info.STRINGLENGTH,L_Long);//we are scanning whole read...
 //--------------------- Setup Data Structure for Batman Prefix ----------------------------------------
-	MEMX MF_Pre,MF_Suf;//MemX is the data structure for doing Batman alignment. MF_Pre is for the prefix, MC for suffix..
+	MEMX MF_Pre,MF_Suf,MF,MC;//MemX is the data structure for doing Batman alignment. MF_Pre is for the prefix, MC for suffix..
 	Init_Batman(MF_Pre,L,MLook,MAX_MISMATCHES);
 	Init_Batman(MF_Suf,L,MLook,MAX_MISMATCHES);
 	Init_Batman(TD.Generic_Hits,L,MLook,MAX_MISMATCHES);
+
+	Init_Batman(MF,L_Long,MLook_Long,MAX_MISMATCHES);
+	Init_Batman(MC,L_Long,MLook_Long,MAX_MISMATCHES);
 //--------------------- Setup Data Structure for Batman End----------------------------------------
 	
 
@@ -273,6 +279,15 @@ void *Map(void *T)
 		TD.Partial_Junctions_Ptr=0;
 		TD.Transcript_Number=0;
 		TD.Max_Junc_Count=0;
+
+
+		char Rev_Bin[MAXTAG],Rev[MAXTAG];
+		Convert_Reverse(Head.Tag,Rev,Rev_Bin,File_Info.STRINGLENGTH);
+		MF.Hits=0;MF.Hit_Array_Ptr=0;MF.Current_Tag=Head.Tag;MF_Pre.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
+		MC.Hits=0;MC.Hit_Array_Ptr=0;MC.Current_Tag=Rev_Bin;MC.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
+		int Mismatch_Scan=Scan_Both(MF,MC,MAX_MISMATCHES,L_Long,fwfmi,revfmi,0,2);
+		if(Mismatch_Scan>=0) continue;
+
 		int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD);
 		TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
 

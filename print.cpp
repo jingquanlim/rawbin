@@ -165,7 +165,7 @@ void Print_Junctions(char* Junction_File,Offset_Record *Genome_Offsets)
 		while (Junc_Not_Empty)
 		{
 			//if(JStat.Junc_Type)
-			if(JStat.Unique)
+			if(JStat.Unique && JStat.Junc_Type)
 			{
 
 				OP H,T;
