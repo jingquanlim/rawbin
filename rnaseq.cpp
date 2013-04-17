@@ -58,6 +58,7 @@ extern const int NON_UNIQUE_SIGNAL=2;
 extern const int NON_UNIQUE_OTHERS=3;
 extern const int MINX=18;//Minimum extension..
 extern const int MIS_DENSITY=1;
+extern const int EXON_GEN_LEN=5000;
 
 const int DUMMY_JUNC=1000;
 const int TRANCRIPT_END=1001;
@@ -154,6 +155,8 @@ void *Map(void *T);
 void Join_Tables(Offset_Record *Genome_Offsets,int Thread_ID);
 void Launch_Threads(int NTHREAD, void* (*Map_t)(void*),Thread_Arg T);
 void Set_Affinity();
+void Scan_End_Junc(char* Current_Tag,int StringLength,Transcript_Data & TD,int & Err);
+void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char Sign,Transcript_Data & TD,int & Err);
 //}-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 
 int main(int argc, char* argv[])
@@ -273,26 +276,34 @@ void *Map(void *T)
 		int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD);
 		TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
 
-		if((TD.Compiled_Junctions_Ptr) && !(DEBUG && Err))
+		if(!TD.Compiled_Junctions_Ptr)//try junc in the end..
 		{
-			int firstSignal = -2;
-			int tempType = Classify_Hits(TD.Compiled_Junctions,firstSignal);
-			int approvedPtr;
-			approvedPtr = getBest(Head.Tag,File_Info.STRINGLENGTH,TD.Compiled_Junctions, selectedJunctions, true);
+			Scan_End_Junc(Head.Tag,File_Info.STRINGLENGTH,TD,Err);
+		}
 
-			if(approvedPtr > 1) 
+		if(TD.Compiled_Junctions_Ptr)
+		{
+			if(!(DEBUG && Err))
 			{
-				Hit_ID++;
-				for(int i=0; i<approvedPtr; i++) 
+				int firstSignal = -2;
+				int tempType = Classify_Hits(TD.Compiled_Junctions,firstSignal);
+				int approvedPtr;
+				approvedPtr = getBest(Head.Tag,File_Info.STRINGLENGTH,TD.Compiled_Junctions, selectedJunctions, true);
+
+				if(approvedPtr > 1) 
 				{
-					Print_Hits(Head,TD.Compiled_Junctions,OUT,rejectedSAM,Tag_Count,selectedJunctions[i],tempType,Hit_ID,Err,Genome_Offsets);//tempType);
-				}
-			}	
-			else 
-			{
-				//assert(approvedPtr);
-				for(int i=0; i<approvedPtr; i++) {
-					Print_Hits(Head,TD.Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType,0,Err,Genome_Offsets);//tempType);
+					Hit_ID++;
+					for(int i=0; i<approvedPtr; i++) 
+					{
+						Print_Hits(Head,TD.Compiled_Junctions,OUT,rejectedSAM,Tag_Count,selectedJunctions[i],tempType,Hit_ID,Err,Genome_Offsets);//tempType);
+					}
+				}	
+				else 
+				{
+					//assert(approvedPtr);
+					for(int i=0; i<approvedPtr; i++) {
+						Print_Hits(Head,TD.Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType,0,Err,Genome_Offsets);//tempType);
+					}
 				}
 			}
 
@@ -300,6 +311,96 @@ void *Map(void *T)
 	}
 	Join_Tables(Genome_Offsets,Thread_ID);
 
+}
+
+void Scan_End_Junc(char* Current_Tag,int StringLength,Transcript_Data & TD,int & Err)
+{
+	char Rev[StringLength],Rev_Bin[StringLength];
+	char Fwd[StringLength];
+	for(int i=0;i<StringLength;i++)
+	{
+		Fwd[i]="ACGT"[Current_Tag[i]];
+	}
+	Convert_Reverse(Current_Tag,Rev,Rev_Bin,StringLength);
+	TD.Compiled_Junctions_Ptr=0;
+	Do_End_Scan(Current_Tag,Fwd,StringLength,1,TD,Err);//+ strand.. 
+	Do_End_Scan(Rev_Bin,Rev,StringLength,0,TD,Err);//+ strand.. 
+	TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
+}
+
+void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char Sign,Transcript_Data & TD,int & Err) 
+{
+	if(Err) return;
+	char* Middle_Tag=Current_Tag+MINX;
+	char* Middle_Tag_ASCII=Current_Tag_ASCII+MINX;
+	int Middle_StringLength=StringLength-2*MINX;
+	char Org_Ten_Mer[11];Org_Ten_Mer[10]=0;
+	for (int i=0;i<10;i++)
+	{
+			Org_Ten_Mer[i]=Current_Tag_ASCII[i+StringLength-10];
+	}
+
+	Reset_MEMX(TD.Generic_Hits);TD.Generic_Hits.FMIndex=REVERSE;
+	LEN L,L_Temp;L_Temp=TD.Generic_Hits.L;L.IGNOREHEAD=0;
+	Split_Read(Middle_StringLength,L);TD.Generic_Hits.L=L;
+	TD.Generic_Hits.Current_Tag=Middle_Tag;
+	
+	Scan(TD.Generic_Hits,2,L,fwfmi,revfmi,0,UINT_MAX);
+
+	char Left[100],Right[100];
+	int Compiled_Junctions_Ptr=TD.Compiled_Junctions_Ptr;
+	for(int i=0;i<TD.Generic_Hits.Hit_Array_Ptr && !Err;i++)
+	{
+		SARange SA=TD.Generic_Hits.Hit_Array[i];
+		if(SA.Start==SA.End)
+		{
+			Get_Bases_ASCII(SA.Start-Middle_StringLength+RQFACTOR-MINX,MINX,Left);Left[MINX]=0;
+			Get_Bases_ASCII(SA.Start+RQFACTOR,MINX+1,Right);//Right[MINX+1]=0;
+			int Left_Mis=0,Right_Mis=0;
+			for(int j=0;j<MINX;j++)
+			{
+				if(Left[j]!=Current_Tag_ASCII[j]) 
+				{
+					Left_Mis++;
+				}
+				if(Right[j]!=Current_Tag_ASCII[j+Middle_StringLength]) 
+				{
+					Right_Mis++;
+				}
+			}
+
+			if(Left_Mis<=MIS_DENSITY)//Left anchors well..
+			{
+				char Right_Long[EXON_GEN_LEN+1];//Right_Long[EXON_GEN_LEN]=0;
+				char* Ten_Mer=Right_Long;
+				Get_Bases_ASCII(SA.Start+RQFACTOR,EXON_GEN_LEN,Right_Long);
+				while(Ten_Mer)
+				{
+					Ten_Mer=strstr(Ten_Mer,Org_Ten_Mer);
+					if(Ten_Mer)//TODO:handle matches..
+					{
+						if((Ten_Mer-Right_Long)<80)
+						{
+							Err++;break;
+						}
+						Junction* junctions = extendX(Current_Tag_ASCII+MINX+Middle_StringLength-1,Right,Ten_Mer-(MINX-10),SA.Start+RQFACTOR-1,SA.Start+RQFACTOR+(Ten_Mer-Right_Long),Sign,MINX+Middle_StringLength);
+						for(int i=0;junctions[i].p!=UINT_MAX;i++)
+						{
+							junctions[i].Label=Compiled_Junctions_Ptr;junctions[i].Junc_Count=1;junctions[i].ID=INT_MAX-1;junctions[i].Sign=Sign;
+							TD.Compiled_Junctions[Compiled_Junctions_Ptr++]=junctions[i];
+						}
+						delete [] junctions;
+						Ten_Mer+=10;
+					}
+
+				}
+
+			}
+		}
+	}
+
+	TD.Generic_Hits.L=L_Temp;
+	TD.Compiled_Junctions_Ptr=Compiled_Junctions_Ptr;
 }
 
 void Join_Tables(Offset_Record *Genome_Offsets,int Thread_ID)

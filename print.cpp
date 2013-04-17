@@ -4,6 +4,13 @@ extern const int UNIQUE_SIGNAL;//there is one junction, it has a signal
 extern const int UNIQUE_NOSIGNAL;//There is one junction, it does not have a signal..
 extern const int NON_UNIQUE_SIGNAL;//There are many local junctions, but only one have a signal..
 //extern Offset_Record Genome_Offsets[];
+char const* Junc_Decode[]={"CAN","SEMI","SEMI","NON"};
+
+char const* Get_Junc_Type(int Type)
+{
+	return Junc_Decode[3-Type];
+	//return !(&& && 
+}
 
 void Open_Outputs(ofstream & SAM,string filename)
 {
@@ -43,7 +50,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 		Ann_Info A;
 		char* CIGAR_ptr=CIGAR;
 		int Last=0;int Label=Final_Juncs[i].Label;
-		for(int j=0;!Err && j<Final_Juncs[i].Junc_Count;j++)
+		for(int j=0;j<Final_Juncs[i].Junc_Count;j++)
 		{
 			Location_To_Genome(Final_Juncs[i+j].p,A);//TODO:one lookup should be enough..
 			Location_To_Genome(Final_Juncs[i+j].q,A);
@@ -52,8 +59,9 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 			Pair.y=Final_Juncs[i+j].q;
 			//Final_Juncs[i].L=Final_Juncs[i].r;
 			//Final_Juncs[i].R=READLEN-Final_Juncs[i].r;
+			if(Final_Juncs[i+j].ID==INT_MAX-1) Final_Juncs[i].ID=A.ID;//Junction at extreme..
 			assert(Genome_Offsets[Final_Juncs[i+j].ID].Offset !=INT_MAX && Final_Juncs[i+j].ID==Final_Juncs[i].ID );
-			Genome_Offsets[Final_Juncs[i].ID].Junc_Hash->Insert(Pair,Final_Juncs[i+j],Hit_ID? false:true);
+			if(!Err) Genome_Offsets[Final_Juncs[i].ID].Junc_Hash->Insert(Pair,Final_Juncs[i+j],Hit_ID? false:true);
 
 			assert(Label==Final_Juncs[i].Label);
 			CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM%dN",Final_Juncs[i+j].r,Final_Juncs[i+j].q-Final_Juncs[i+j].p+1);
@@ -63,7 +71,8 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 
 		SAM << Head.Description+1 <<"\t"
 			<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  /*Flag*/
-			<< Final_Juncs[i].Chrom <<"\t" 
+			//<< Final_Juncs[i].Chrom <<"\t" 
+			<< A.Name <<"\t" 
 			<< Final_Juncs[i].p-Final_Juncs[i].r+1 << "\t" 
 			<< 60 <<"\t" 
 			<<CIGAR<<"\t"
@@ -177,7 +186,7 @@ void Print_Junctions(char* Junction_File,Offset_Record *Genome_Offsets)
 				{
 					printf ("Print_BED():Junction Parse error..\nH.x:H.y=[%u,%u]       T.x:T.y=[%u,%u]\n",H.x,H.y,T.x,T.y);exit(0);
 				}
-				char const *Junction_Type="ACGT";//Get_Junc_Type(JStat.Junc_Type);
+				char const *Junction_Type=Get_Junc_Type(JStat.Junc_Type);
 				JUNCFILE
 					<< Chromosome <<"\t"
 					<< H.x <<"\t" << T.y+1 <<"\t"/*Chrom start and end...*/

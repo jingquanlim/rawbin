@@ -273,3 +273,59 @@ Junction* extend(char* R, unsigned x, unsigned y, unsigned p, unsigned q, char s
 
 	return junctions;
 }
+
+
+Junction* extendX(char* R,char* basesL,char* basesR,unsigned p,unsigned q,char sign,unsigned x) 
+{
+	//unsigned x=0, y=0; 
+	
+	//To allow some over extension into the anchors
+	/*x -= 5;
+	y += 5;
+	q += 5;*/
+
+
+	unsigned size = MINX-10;
+	int misL[size+1], misR[size+1];
+	//basesL[size] = 0;
+
+	int countL=0, countR=0;
+	misL[0] = misR[size] = 0;
+	for(int i=1; i<size+1; i++)
+	{
+		if(R[i] != basesL[i-1])
+			++countL;
+		if(R[size+1-i] != basesR[size-i])
+			++countR;
+		misL[i] = countL;
+		misR[size-i] = countR;
+	}
+
+	//Find the partitions that give the minimum mismatches.
+	//Partitions store the size of the portion of the left extension.
+	int min= misL[0] + misR[0],Sig_Score=0;
+	int Can_min= misL[0] + misR[0];
+	int parCount = 0,Canonical_parcount=0;
+	int partitions[size+1];
+	int Canonical_partitions[size+1];
+	partitions[0] = 0;Canonical_partitions[0] = 0;
+	Find_Partitions(size,misR,misL,basesL,basesR,partitions,Canonical_partitions,parCount,Canonical_parcount,min,Can_min,Sig_Score); 
+	
+	//Find the junctions based on the partitions obtained
+	Junction *junctions = new Junction[parCount+1];
+	bool Can_Junctions=Fill_Junctions(junctions,parCount,partitions,p-x+1,q,x-1,size,misL,misR,sign);
+	junctions[parCount].p = UINT_MAX;
+	
+	if(!Can_Junctions && Canonical_parcount && Can_min-1<=min)
+	{
+		if(parCount<Canonical_parcount);
+		{
+			delete [] junctions;
+			junctions = new Junction[Canonical_parcount+1];
+		}
+		Fill_Junctions(junctions,Canonical_parcount,Canonical_partitions,p-x,q,x,size,misL,misR,sign);
+		junctions[Canonical_parcount].p = UINT_MAX;
+	}
+
+	return junctions;
+}
