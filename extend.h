@@ -11,7 +11,7 @@ extern unsigned char* Original_Text;
 int Canonical_Score(char* signal);
 Junction* extend(char* R, unsigned x, unsigned y, unsigned p, unsigned q, char sign);
 void loadPac(char* filename);
-void Get_Bases_ASCII (unsigned Location,int StringLength,char* Org_String);
+bool Get_Bases_ASCII (unsigned Location,int StringLength,char* Org_String);
 void Get_Bases(unsigned Location,int StringLength,char* Org_String);
 inline void Convert_Reverse(char* Read_bin, char* RC_bin,int StringLength);
 float signalScore(char* signal);

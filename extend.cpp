@@ -11,6 +11,8 @@ extern const bool DEBUG;
 extern const int MINX;//Minimum extension..
 extern float Donor_Prob[16][64][2];
 extern float Acc_Prob[16][64][2];
+extern BWT *revfmi;
+extern int TENMER;
 
 int Junction::isCanonical(){
 	//return !(strcmp(signal, "GTAG") && strcmp(signal, "GCAG") && strcmp(signal, "ATAC") && strcmp(signal, "CTAC") && strcmp(signal, "CTGC") && strcmp(signal, "GTAT"));
@@ -54,14 +56,19 @@ void loadPac(char* filename){
 	fread(Original_Text,Get_File_Size(Original_File),1,Original_File);
 }
 
-void Get_Bases_ASCII (unsigned Location,int StringLength,char* Org_String)
+bool Get_Bases_ASCII (unsigned Location,int StringLength,char* Org_String)
 {
+	if(revfmi->textLength<Location+StringLength)
+	{
+		return false;
+	}
 	for (int i=0;i<StringLength;i++)
 	{
 		unsigned char L= (unsigned char)(Original_Text[(Location+i)/4]<< (((Location+i) % 4) * 2)) >>6;
 		Org_String[i]="ACGT"[L];
 	}
 	Org_String[StringLength]=0;
+	return true;
 }
 
 void Get_Bases(unsigned Location,int StringLength,char* Org_String)
@@ -159,6 +166,7 @@ bool Fill_Junctions(Junction* junctions,const int parCount,int* partitions,const
 		junctions[i].p = p + x + partitions[i] + 1;
 		junctions[i].q = q - size + partitions[i] - 1;
 		junctions[i].r = x + partitions[i] + 1;
+		//assert(junctions[i].p<=junctions[i].q);
 		junctions[i].score = getScore(p,q,x,size,partitions[i],misL[partitions[i]],misR[partitions[i]],sign);
 		junctions[i].Mismatches = misL[partitions[i]] + misR[partitions[i]];
 		char signal[5];
@@ -285,7 +293,7 @@ Junction* extendX(char* R,char* basesL,char* basesR,unsigned p,unsigned q,char s
 	q += 5;*/
 
 
-	unsigned size = MINX-10;
+	unsigned size = MINX-TENMER;
 	int misL[size+1], misR[size+1];
 	//basesL[size] = 0;
 
