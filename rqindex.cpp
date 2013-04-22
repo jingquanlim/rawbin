@@ -33,35 +33,40 @@ One:
 	{
 		In_Mis=1;
 		Hits+=One_Mismatch(MF.Current_Tag,L,Max_Hits,fwfmi,revfmi,MF);
-		Hits+=One_Mismatch(MC.Current_Tag,L,Max_Hits,fwfmi,revfmi,MC);
+		if(Hits<Max_Hits)
+			Hits+=One_Mismatch(MC.Current_Tag,L,Max_Hits,fwfmi,revfmi,MC);
 	}
 Two:
 	if (!Hits && MAX_MISMATCHES >1)
 	{
 		In_Mis=2;
 		Hits+=Two_Mismatch(MF.Current_Tag,L,Max_Hits,fwfmi,revfmi,MF);
-		Hits+=Two_Mismatch(MC.Current_Tag,L,Max_Hits,fwfmi,revfmi,MC);
+		if(Hits<Max_Hits)
+			Hits+=Two_Mismatch(MC.Current_Tag,L,Max_Hits,fwfmi,revfmi,MC);
 	}
 Three:
 	if (!Hits && MAX_MISMATCHES >2)
 	{
 		In_Mis=3;
 		Hits+=Three_Mismatch(MF.Current_Tag,L,Max_Hits,fwfmi,revfmi,MF);
-		Hits+=Three_Mismatch(MC.Current_Tag,L,Max_Hits,fwfmi,revfmi,MC);
+		if(Hits<Max_Hits)
+			Hits+=Three_Mismatch(MC.Current_Tag,L,Max_Hits,fwfmi,revfmi,MC);
 	}
 Four:
 	if (!Hits && MAX_MISMATCHES >3)
 	{
 		In_Mis=4;
 		Hits+=Four_Mismatch(MF.Current_Tag,L,Max_Hits,fwfmi,revfmi,MF);
-		Hits+=Four_Mismatch(MC.Current_Tag,L,Max_Hits,fwfmi,revfmi,MC);
+		if(Hits<Max_Hits)
+			Hits+=Four_Mismatch(MC.Current_Tag,L,Max_Hits,fwfmi,revfmi,MC);
 	}
 Five:
 	if (!Hits && MAX_MISMATCHES >4)
 	{
 		In_Mis=5;
 		Hits+=Five_Mismatch(MF.Current_Tag,L,Max_Hits,fwfmi,revfmi,MF);
-		Hits+=Five_Mismatch(MC.Current_Tag,L,Max_Hits,fwfmi,revfmi,MC);
+		if(Hits<Max_Hits)
+			Hits+=Five_Mismatch(MC.Current_Tag,L,Max_Hits,fwfmi,revfmi,MC);
 	}
 
 	MF.Hit_Array[MF.Hit_Array_Ptr].Start=0;//MC.Hit_Array[MC.Hit_Array_Ptr].Start=0;//tag sentinels to sa lists..
