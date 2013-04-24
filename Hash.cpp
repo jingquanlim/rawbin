@@ -2,6 +2,7 @@
 #include "limits.h"
 #include "assert.h"
 #include <iostream>
+extern const int CANONICAL_SCORE;
 
 map_it Hash::Begin ()
 {
@@ -12,7 +13,7 @@ void Hash::Insert (OP Location,Junction & J,bool Unique)
 {
 	JStat T;
 	int Paring=J.Type;
-	assert(Paring >=0 && Paring <=3); 
+	assert(Paring >=0 && Paring <=CANONICAL_SCORE); 
 	assert(Location.x <= Location.y);
 	Junc_I=Junctions.find(Location);
 	if (Junc_I == Junctions.end()) //New entry..

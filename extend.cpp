@@ -7,6 +7,7 @@
 using namespace std;
 
 extern const int MIS_DENSITY;
+extern const int CANONICAL_SCORE;
 extern const bool DEBUG;
 extern const int MINX;//Minimum extension..
 extern float Donor_Prob[16][64][2];
@@ -24,11 +25,11 @@ int Canonical_Score(char* signal)
 	assert(strlen(signal)==4);
 	if(!strcmp(signal, "GTAG") || !strcmp(signal, "CTAC"))
 	{
-		return 3;
+		return CANONICAL_SCORE;
 	}	
 	else if(!strcmp(signal, "GCAG") || !strcmp(signal, "CTGC"))
 	{
-		return 1;
+		return 2;
 	}	
 	else if(!strcmp(signal, "ATAC") || !strcmp(signal, "GTAT"))
 	{

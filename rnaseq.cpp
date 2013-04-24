@@ -62,6 +62,7 @@ extern const int NON_UNIQUE_OTHERS=3;
 extern const int MINX=18;//Minimum extension..
 extern const int MIS_DENSITY=1;
 extern const int EXON_GEN_LEN=5000;
+extern const int CANONICAL_SCORE=3;
 
 const int DUMMY_JUNC=1000;
 const int TRANCRIPT_END=1001;
@@ -186,7 +187,7 @@ int main(int argc, char* argv[])
 	Parse_Command_line(argc,argv,Genome_Files,CL);
 	Load_All_Indexes(Genome_Files,fwfmi,revfmi,mmPool,Range_Index);
 	Print_SAM_Header(Annotations,argc,argv,CL.PATTERNFILE);
-	Init(revfmi,SOURCELENGTH,Input_File,Mate_File,File_Info,CL,Genome_Files);
+	Init(revfmi,SOURCELENGTH,Input_File,Mate_File,File_Info,CL,Genome_Files,INIT_MIS_SCAN);
 	Open_Genome_Files(Genome_Files.LOCATIONFILE,Genome_Offsets_Main,Offsets);
 	Conversion_Factor=revfmi->textLength-RQFACTOR;
 
@@ -300,7 +301,7 @@ void *Map(void *T)
 		Convert_Reverse(Head.Tag,Rev,Rev_Bin,File_Info.STRINGLENGTH);
 		MF.Hits=0;MF.Hit_Array_Ptr=0;MF.Current_Tag=Head.Tag;MF_Pre.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
 		MC.Hits=0;MC.Hit_Array_Ptr=0;MC.Current_Tag=Rev_Bin;MC.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
-		int Mismatch_Scan=Scan_Both(MF,MC,INIT_MIS_SCAN,L_Long,fwfmi,revfmi,0,1);
+		int Mismatch_Scan=Scan_Both(MF,MC,INIT_MIS_SCAN,L_Long,fwfmi,revfmi,0,2);
 		if(Mismatch_Scan>=0) continue;
 
 		int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q);
@@ -1110,9 +1111,9 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 			//so anchor S[Read_Skip-18,Read_Skip]
 			//Penguin S[Read_Skip-18,Read_Skip] ---- S[Read_Skip+18,Read_Skip+36] and extend..
 			Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX,TD,Q+Read_Skip-MINX);
-			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-6,TD);
-			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-12,TD);
-			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-15,TD);
+			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-6,TD,Q+Read_Skip-MINX);
+			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-12,TD,Q+Read_Skip-MINX);
+			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-15,TD,Q+Read_Skip-MINX);
 		}
 	}
 
