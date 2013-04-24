@@ -5,6 +5,7 @@
 #include "const.h"
 #define FALSE 0
 extern int THREAD;
+extern int INIT_MIS_SCAN;
 option Long_Options[]=
 {
 {"help",0,NULL,'h'},
@@ -30,7 +31,7 @@ void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 " --query | -w <filename>\t\t Wiggle file...\n"
 " --query | -O <filename>\t\t log read mapping info...\n"
 " --query | -G <number>\t\t maximum gap between two introns...\n"
-" --query | -n <number>\t\t number of mismatches in non spliced junctions...\n"
+" --query | -n <number>\t\t number of mismatches in Initial Scan...\n"
 " --query | -N <number>\t\t number of mismatches in splices...\n"
 " --query | -b \t\t build files from refgene\n"
 " --query | -j \t\t output all junctions...\n"
@@ -67,6 +68,9 @@ void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 			case 'o':
 				CL.JUNCTIONFILE=optarg;
 				break;
+			case 'n':
+				INIT_MIS_SCAN=atoi(optarg);
+				break;
 			/*case 'j':
 				DUMP_ALL_JUNC=TRUE;
 				break;
@@ -81,9 +85,6 @@ void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 				break;
 			case 'p':
 				MAPMODE=FALSE;PROCESSMODE=TRUE;
-				break;
-			case 'n':
-				MIS_IN_INITMAP=atoi(optarg);
 				break;
 			case 'N':
 				COUNT=atoi(optarg);

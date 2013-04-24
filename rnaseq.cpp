@@ -80,6 +80,7 @@ const int MAX_INSPECTED_PAIRS=20000;//INT_MAX;
 const int QUALITYCONVERSIONFACTOR=33;
 
 const int POWLIMIT=300;
+char Dummy_Q[]="IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII";
 float POW10[POWLIMIT];
 
 int TENMER=10;
@@ -100,6 +101,7 @@ char Char_To_Code[256];
 unsigned Offsets[80];
 Offset_Record Genome_Offsets_Main[80];
 int ORG_STRINGLENGTH;
+int INIT_MIS_SCAN=0;
 
 unsigned RQ_Hits;
 SA* SA_Index;
@@ -298,10 +300,10 @@ void *Map(void *T)
 		Convert_Reverse(Head.Tag,Rev,Rev_Bin,File_Info.STRINGLENGTH);
 		MF.Hits=0;MF.Hit_Array_Ptr=0;MF.Current_Tag=Head.Tag;MF_Pre.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
 		MC.Hits=0;MC.Hit_Array_Ptr=0;MC.Current_Tag=Rev_Bin;MC.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
-		int Mismatch_Scan=Scan_Both(MF,MC,MAX_MISMATCHES+2,L_Long,fwfmi,revfmi,0,1);
+		int Mismatch_Scan=Scan_Both(MF,MC,INIT_MIS_SCAN,L_Long,fwfmi,revfmi,0,1);
 		if(Mismatch_Scan>=0) continue;
 
-		int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD,Head.Quality);
+		int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q);
 		TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
 
 		if(!TD.Compiled_Junctions_Ptr)//try junc in the end..
@@ -311,7 +313,7 @@ void *Map(void *T)
 
 		if(TD.Compiled_Junctions_Ptr)
 		{
-			if(!(DEBUG && Err))
+			if(!Err)
 			{
 				int firstSignal = -2;
 				int tempType = Classify_Hits(TD.Compiled_Junctions,firstSignal);
@@ -335,6 +337,15 @@ void *Map(void *T)
 				}
 			}
 
+		}
+		else if(TD.Partial_Junctions_Ptr==1 && TD.Partial_Junctions[0].Junc_Count==1)
+		{
+			if(int Type=Canonical_Score(TD.Partial_Junctions[0].signal))
+			{
+				selectedJunctions[0]=0;TD.Partial_Junctions[0].Type=Type;
+				Print_Hits(Head,TD.Partial_Junctions,OUT,SAM[0],Tag_Count,selectedJunctions[0],0,0,Err,Genome_Offsets);//tempType);
+
+			}
 		}
 	}
 	Join_Tables(Genome_Offsets,Thread_ID);
@@ -668,12 +679,16 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 			for(int j=0;j<Junc_Count;j++)
 			{
 				assert(Label==Final_Juncs[i+j].Label);
-				Junc_Score+=Final_Juncs[i+j].Type-Junc_Count*2;
-				if(dist<(Final_Juncs[i+j].q-Final_Juncs[i+j].p))
+				Junc_Score+=Final_Juncs[i+j].Type;
+				//Junc_Score+=Final_Juncs[i+j].Type-Junc_Count*2;
+				if(dist<(Final_Juncs[i+j].q-Final_Juncs[i+j].p)) //Pick Min dist
 				{
 					dist=Final_Juncs[i+j].q-Final_Juncs[i+j].p;
 				}
+				//dist+=Final_Juncs[i+j].q-Final_Juncs[i+j].p;
 			}
+			Junc_Score-=Junc_Count*2;
+			//dist=dist/Junc_Count;
 
 			assert(dist>0);
 			if(dist>30000) Junc_Score+=1;
@@ -920,9 +935,9 @@ bool Align(char* Source,int StringLength,unsigned Dest_Loc,SARange & R,int Actua
 		char Dest[StringLength];
 		Get_Bases(Dest_Loc,StringLength,Dest);
 		int Mis_Count=0;
-		float PScore=0,t;
+		float PScore=0;
 		//for(int i=0;i<StringLength && Mis_Count<=1/*Max mis allowed*/;i++)
-		for(int i=0;i<StringLength && PScore<=32/*Max mis allowed*/;i++)
+		for(int i=0;i<StringLength && PScore<=32;i++)
 		{
 			assert(Dest[i]<=4 && Dest[i]>=0 && Source[i]<=4 && Source[i]>=0);
 			if(Dest[i]!=Source[i])
