@@ -102,7 +102,7 @@ char Char_To_Code[256];
 unsigned Offsets[80];
 Offset_Record Genome_Offsets_Main[80];
 int ORG_STRINGLENGTH;
-int INIT_MIS_SCAN=0;
+int INIT_MIS_SCAN=-1;
 
 unsigned RQ_Hits;
 SA* SA_Index;
@@ -159,18 +159,20 @@ inline void Convert_Reverse(char* Read,char * RC_Read,char* RC_Bin,int StringLen
 void Print_SAM_Header(std::map <unsigned, Ann_Info> Annotations,int argc,char* argv[],char* Input_File);
 void Init_Prob();
 void fillProbArray(float prob[16][64][2], string filename);
-int getBest(char* Current_Tag,int StringLength,Junction * Compiled_Junctions, int * approved, bool print);
+//int getBest(char* Current_Tag,int StringLength,Junction * Compiled_Junctions, int * approved, bool print);
+int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * approved, bool print,char* Q);
 void Reset_MEMX(MEMX & M);
 bool Exons_Too_Small(int Trans_Array_Ptr,Transcript_Data & TD);
 void *Map(void *T);
 void Join_Tables(Offset_Record *Genome_Offsets,int Thread_ID);
 void Launch_Threads(int NTHREAD, void* (*Map_t)(void*),Thread_Arg T);
 void Set_Affinity();
-void Scan_End_Junc(char* Current_Tag,int StringLength,Transcript_Data & TD,int & Err);
-void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char Sign,Transcript_Data & TD,int & Err);
+void Scan_End_Junc(char* Current_Tag,int StringLength,Transcript_Data & TD,int & Err,char* Q);
+void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char Sign,Transcript_Data & TD,int & Err,char* Q);
 float Penalty(char Q);
 void Build_Pow10();
 void Reverse_Quality(char* Dest,char* Q,int StringLength);
+bool Mismatch_Hit_Nice(int Mismatch_Scan,MEMX & MF,MEMX & MC,char* Q,int StringLength);
 //}-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 
 int main(int argc, char* argv[])
@@ -302,14 +304,14 @@ void *Map(void *T)
 		MF.Hits=0;MF.Hit_Array_Ptr=0;MF.Current_Tag=Head.Tag;MF_Pre.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
 		MC.Hits=0;MC.Hit_Array_Ptr=0;MC.Current_Tag=Rev_Bin;MC.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
 		int Mismatch_Scan=Scan_Both(MF,MC,INIT_MIS_SCAN,L_Long,fwfmi,revfmi,0,2);
-		if(Mismatch_Scan>=0) continue;
+		if(Mismatch_Hit_Nice(Mismatch_Scan,MF,MC,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q,File_Info.STRINGLENGTH)) continue;
 
 		int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q);
 		TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
 
 		if(!TD.Compiled_Junctions_Ptr)//try junc in the end..
 		{
-			Scan_End_Junc(Head.Tag,File_Info.STRINGLENGTH,TD,Err);
+			Scan_End_Junc(Head.Tag,File_Info.STRINGLENGTH,TD,Err,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q);
 		}
 
 		if(TD.Compiled_Junctions_Ptr)
@@ -319,7 +321,7 @@ void *Map(void *T)
 				int firstSignal = -2;
 				int tempType = Classify_Hits(TD.Compiled_Junctions,firstSignal);
 				int approvedPtr;
-				approvedPtr = getBest(Head.Tag,File_Info.STRINGLENGTH,TD.Compiled_Junctions, selectedJunctions, true);
+				approvedPtr = getBest(Head.Tag,File_Info.STRINGLENGTH,TD.Compiled_Junctions, selectedJunctions, true,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q);
 
 				if(approvedPtr > 1) 
 				{
@@ -329,7 +331,7 @@ void *Map(void *T)
 						Print_Hits(Head,TD.Compiled_Junctions,OUT,rejectedSAM,Tag_Count,selectedJunctions[i],tempType,Hit_ID,Err,Genome_Offsets);//tempType);
 					}
 				}	
-				else 
+				else if(approvedPtr) 
 				{
 					//assert(approvedPtr);
 					for(int i=0; i<approvedPtr; i++) {
@@ -353,23 +355,25 @@ void *Map(void *T)
 
 }
 
-void Scan_End_Junc(char* Current_Tag,int StringLength,Transcript_Data & TD,int & Err)
+void Scan_End_Junc(char* Current_Tag,int StringLength,Transcript_Data & TD,int & Err,char* Q)
 {
-	char Rev[StringLength],Rev_Bin[StringLength];
+	char Rev[StringLength],Rev_Bin[StringLength],RQ[MAXTAG];
 	char Fwd[StringLength];
 	for(int i=0;i<StringLength;i++)
 	{
 		Fwd[i]="ACGT"[Current_Tag[i]];
 	}
 	Convert_Reverse(Current_Tag,Rev,Rev_Bin,StringLength);
+	Reverse_Quality(RQ,Q,StringLength);
+
 	TD.Compiled_Junctions_Ptr=0;
-	Do_End_Scan(Current_Tag,Fwd,StringLength,1,TD,Err);//+ strand.. 
-	Do_End_Scan(Rev_Bin,Rev,StringLength,0,TD,Err);//+ strand.. 
+	Do_End_Scan(Current_Tag,Fwd,StringLength,1,TD,Err,Q);//+ strand.. 
+	Do_End_Scan(Rev_Bin,Rev,StringLength,0,TD,Err,RQ);//+ strand.. 
 	TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
 }
 
 const int MAX_PATTERN_MATCH=5;
-void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char Sign,Transcript_Data & TD,int & Err) 
+void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char Sign,Transcript_Data & TD,int & Err,char* Q) 
 {
 	if(Err) return;
 	char* Middle_Tag=Current_Tag+MINX;
@@ -412,19 +416,23 @@ void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char
 			}
 			Left[MINX+2]=0;//Right[MINX+1]=0;
 			int Left_Mis=0,Right_Mis=0;
+			float LScore=0,RScore=0;
 			for(int j=0;j<MINX;j++)
 			{
 				if(Left[j]!=Current_Tag_ASCII[j]) 
 				{
+					LScore+=Penalty(Q[j]);
 					Left_Mis++;
 				}
 				if(Right[j]!=Current_Tag_ASCII[j+Middle_StringLength+MINX]) 
 				{
 					Right_Mis++;
+					RScore+=Penalty(Q[j]);
 				}
 			}
 
-			if(Left_Mis<=MIS_DENSITY)//Left anchors well..
+			//if(Left_Mis<=MIS_DENSITY)//Left anchors well..
+			if(LScore<=32)//Left anchors well..
 			{
 				char Right_Long[EXON_GEN_LEN+1];//Right_Long[EXON_GEN_LEN]=0;
 				char* Ten_Mer=Right_Long;
@@ -476,7 +484,8 @@ void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char
 
 			}
 
-			if(Right_Mis<=MIS_DENSITY)//Right anchors well..
+			//if(Right_Mis<=MIS_DENSITY)//Right anchors well..
+			if(RScore<=32)//Right anchors well..
 			{
 				char Left_Long[EXON_GEN_LEN+1];//Right_Long[EXON_GEN_LEN]=0;
 				char* Ten_Mer=Left_Long;
@@ -602,20 +611,22 @@ int Classify_Hits(Junction * Final_Juncs, int & firstSignal){
 		return NON_UNIQUE_OTHERS;
 }
 
-int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * approved, bool print) {
+int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * approved, bool print,char* Q) {
 	float max = -100000;
 	int ptr = 0;
 	int count = 0;
-	char RC_Read[MAXDES],RC_Bin[MAXDES];
+	char RC_Read[MAXDES],RC_Bin[MAXDES],RQ[MAXTAG];
 	char Cat[MAXDES];
 	int Mismatch_Pos[MAXDES];
 	Convert_Reverse(Current_Tag,RC_Read,RC_Bin,StringLength);
+	Reverse_Quality(RQ,Q,StringLength);
 
 //Calculate true mismatches..
 	int Junc_Count=Final_Juncs[0].Junc_Count;
 	for(int i =0; Final_Juncs[i].p != UINT_MAX;i+=(Junc_Count ? Junc_Count:1),\
 						   Junc_Count=Final_Juncs[i].Junc_Count) 
 	{
+		bool Full_String=false;
 		if(Final_Juncs[i].q)
 		{
 			int Last=0;
@@ -628,25 +639,40 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 		}
 		else
 		{
+			Full_String=true;
 			Get_Bases_ASCII(Final_Juncs[i].p, StringLength,Cat);
 		}
 
-		char* Read;
+		char* Read;char* Qual;
 		Final_Juncs[i].Mismatches=0;
 		if(Final_Juncs[i].Sign)
-			Read=Current_Tag;
+		{
+			Read=Current_Tag;Qual=Q;
+		}
 		else
-			Read=RC_Bin;
+		{
+			Read=RC_Bin;Qual=RQ;
+		}
 
-		int Pos=0;
+		int Pos=0;float PScore=0;
 		for(int j=0;j<StringLength;j++)
 		{
 			if(Cat[j]!="ACGT"[Read[j]]) 
 			{
 				Final_Juncs[i].Mismatches++;
+				PScore+=Penalty(Qual[j]);
 				Mismatch_Pos[Pos++]=j;
 			}
 			Cat[j]=0;
+		}
+
+		if(Full_String && PScore<32)
+		{
+			return 0;
+		}
+		if(PScore>32)
+		{
+			Final_Juncs[i].Mismatches==100;
 		}
 
 		Final_Juncs[i].score= 0;
@@ -669,6 +695,8 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 
 	for(int i =0; Final_Juncs[i].p != UINT_MAX; i+=(Final_Juncs[i].Junc_Count)? Final_Juncs[i].Junc_Count:1)
 	{
+
+		if(!Final_Juncs[i].Mismatches==100) continue; 
 		int Junc_Score=0;
 		if(!Final_Juncs[i].q) Junc_Score=4;
 		else
@@ -1105,7 +1133,7 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 	{
 		if(Exons_Too_Small(Trans_Array_Ptr,TD)) return 0;
 		//Case of a single junction between S[a,a+2l-1]
-		if (Junc_Count-1<TD.Max_Junc_Found) //This will add one junction..
+		if (Junc_Count<=TD.Max_Junc_Found) //This will add one junction..
 		{
 			//the junction is between S[Read_Skip,Read_Skip+18]
 			//so anchor S[Read_Skip-18,Read_Skip]
@@ -1360,3 +1388,35 @@ void Reverse_Quality(char* Dest,char* Q,int StringLength)
 	*Dest=0;
 }
 
+bool Mismatch_Hit_Nice(int Mismatch_Scan,MEMX & MF,MEMX & MC,char* Q,int StringLength)
+{
+	char RQ[MAXTAG];
+	if(Mismatch_Scan== -1)//No mismatch hits..
+	{
+		return false;
+	}
+	SARange SA;float PScore=0;
+	if(MF.Hits+MC.Hits>1)//Many mismatch hits..
+		return true;
+	if(MF.Hits)
+	{
+		SA=MF.Hit_Array[0];
+		for (int i=0;i<SA.Mismatches;i++)
+		{
+			PScore+=Penalty(Q[SA.Mismatch_Pos[i]]);
+		}
+	}
+	else
+	{
+		Reverse_Quality(RQ,Q,StringLength);
+		SA=MC.Hit_Array[0];
+		for (int i=0;i<SA.Mismatches;i++)
+		{
+			PScore+=Penalty(Q[SA.Mismatch_Pos[i]]);
+		}
+	}
+	if(PScore<30) 
+		return true;
+	else
+		return false;
+}

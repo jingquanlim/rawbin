@@ -42,7 +42,7 @@ void Init(BWT *revfmi,unsigned & SOURCELENGTH,gzFile & Input_File,gzFile & Mate_
 		INDEX_RESOLUTION=30000;
 	}
 	
-	if(!INIT_MIS_SCAN)
+	if(INIT_MIS_SCAN==-1)
 	{
 		if (File_Info.STRINGLENGTH<=80)
 		{
@@ -81,7 +81,8 @@ bool  Progress_Bar(Parameters & CL,unsigned & Number_of_Tags,unsigned & Progress
 			unsigned Average_Length=Current_Pos/Tag_Count+1;//+1 avoids divide by zero..
 			Number_of_Tags=(File_Info.File_Size/Average_Length)/20;
 			Progress=0;
-			Show_Progress(Current_Pos*100/File_Info.File_Size);
+			off64_t Perc= Current_Pos*100/File_Info.File_Size;
+			Show_Progress(Perc);
 		}
 	}
 	return true;
