@@ -181,3 +181,19 @@ int Open_Genome_Files(char* LOCATIONFILE,Offset_Record* Genome_Offsets,unsigned 
 	pthread_mutex_unlock(&OpenGenomeFileslock);
 	return Genome_Count-1;
 }
+
+
+void Load_FM_Indexes(Index_Info Genome_Files,BWT* & fwfmi,BWT* & revfmi,MMPool* & mmPool)
+{
+	fprintf (stderr,"Loading index %s\n",Genome_Files.BWTFILE);
+	fwfmi= Load_Indexes(Genome_Files.BWTFILE,Genome_Files.OCCFILE,Genome_Files.SAFILE,mmPool);
+	fprintf (stderr,"Loading index %s\n",Genome_Files.REVBWTINDEX);
+	revfmi= Load_Indexes(Genome_Files.REVBWTINDEX,Genome_Files.REVOCCFILE,Genome_Files.REVSAFILE,mmPool);
+	fwfmi->saInterval=revfmi->saInterval;
+	fprintf (stderr,"Loading Location %s\n",Genome_Files.LOCATIONFILE);
+	int Genome_Count= Load_Location(Genome_Files.LOCATIONFILE,Annotations,Location_Array);
+	/*fprintf (stderr,"Loading packed genome %s\n",Genome_Files.BINFILE);
+	loadPac(Genome_Files.BINFILE);*/
+	fprintf (stderr,"Loading index %s\n",Genome_Files.INDFILE);
+	fprintf(stderr,"Done...\n");
+}

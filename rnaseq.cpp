@@ -67,6 +67,8 @@ extern const int CANONICAL_SCORE=3;
 const int DUMMY_JUNC=1000;
 const int TRANCRIPT_END=1001;
 extern const bool DEBUG=false;
+const int QSUM_LIMIT=32;
+//const int QSUM_LIMIT=60;
 
 struct Transcript
 {
@@ -81,6 +83,7 @@ const int MAX_INSPECTED_PAIRS=20000;//INT_MAX;
 const int QUALITYCONVERSIONFACTOR=33;
 
 const int POWLIMIT=300;
+bool DEEPSCAN=false;
 char Dummy_Q[]="IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII";
 float POW10[POWLIMIT];
 
@@ -124,16 +127,24 @@ pthread_mutex_t lock;
 pthread_mutex_t fillProbArraylock;
 pthread_mutex_t OpenGenomeFileslock;
 //}---------------------------- GLOBAL VARIABLES -------------------------------------------------
+struct Potential_Hit
+{
+	SARange SA;
+	int Read_Skip;
+	char Sign;
+};
 
 struct Transcript_Data
 {
 	Junction Trans_Array[MAX_JUNCS_IN_TRANSCRIPT+1];
 	Junction Compiled_Junctions[MAX_JUNCS_ALLOWED+1];
 	Junction Partial_Junctions[MAX_JUNCS_ALLOWED+1];
+	Potential_Hit Ext_Array[MAX_JUNCS_ALLOWED+1];
 	int Compiled_Junctions_Ptr;
 	int Partial_Junctions_Ptr;
 	int Max_Junc_Found;
 	int Transcript_Number;
+	int Ext_Array_Ptr;
 	int Max_Junc_Count;
 	int Least_Mis_In_Junc;
 	MEMX Generic_Hits;
@@ -173,6 +184,11 @@ float Penalty(char Q);
 void Build_Pow10();
 void Reverse_Quality(char* Dest,char* Q,int StringLength);
 bool Mismatch_Hit_Nice(int Mismatch_Scan,MEMX & MF,MEMX & MC,char* Q,int StringLength);
+void Scan_Partial_Read(char* Current_Tag,int StringLength,MEMX & Pre, MEMX & Suf,Transcript_Data & TD,char* Q);
+void Partial_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,MEMX & Pre,MEMX & Suf,char Sign,Transcript_Data & TD,int & Err,char* Q);
+void Scan_Right_Read(char* Current_Tag,int StringLength,MEMX & Pre, MEMX & Suf,Transcript_Data & TD,char* Q);
+void Extension_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,MEMX & Pre,MEMX & Suf,char Sign,Transcript_Data & TD,int & Err,char* Q);
+void Seek_Residue(int & GT_Ptr,int *GT,char* Current_Tag_ASCII,int StringLength,char* RightX,char* Q,char *Signal,unsigned Loc,Transcript_Data & TD,char Sign);
 //}-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 
 int main(int argc, char* argv[])
@@ -238,15 +254,15 @@ void *Map(void *T)
 	Offset_Record Genome_Offsets[80];
 
 //------------------- INIT -------------------------------------------------------------
-	ofstream SAM[4];
-	string SAMFiles[] = {"unique_signal","unique_nosignal",/*"mishits.fq",*/"nonunique_onesignal","others"};
+	ofstream SAM[5];
+	string SAMFiles[] = {"unique_signal","unique_nosignal",/*"mishits.fq",*/"nonunique_onesignal","others","mishits"};
 	PAIR *Pairs;
 	//Junction Final_Juncs[2*MAX_JUNCS_TO_STORE+2];
 
 	if (!(Pairs=(PAIR*)malloc(sizeof(PAIR)*(MAX_HITS_TO_STORE+10)))) {fprintf(stderr,"Allocate_Memory():malloc error...\n");exit(100);}
 	if (CL.JUNCTIONFILE) OUT=File_Open(CL.JUNCTIONFILE,"w"); else OUT=stdout;
 	Open_Genome_Files(Genome_Files.LOCATIONFILE,Genome_Offsets,Offsets);
-	for(int i=0;i<4;i++)
+	for(int i=0;i<5;i++)
 	{
 		Open_Outputs(SAM[i],SAMFiles[i]+Str_Thread_ID+".sam");
 	}
@@ -269,7 +285,7 @@ void *Map(void *T)
 	MEMX MF_Pre,MF_Suf,MF,MC;//MemX is the data structure for doing Batman alignment. MF_Pre is for the prefix, MC for suffix..
 	Init_Batman(MF_Pre,L,MLook,MAX_MISMATCHES);
 	Init_Batman(MF_Suf,L,MLook,MAX_MISMATCHES);
-	Init_Batman(TD.Generic_Hits,L,MLook,MAX_MISMATCHES);
+	Init_Batman(TD.Generic_Hits,L,MLook,MAX_MISMATCHES+1);
 
 	Init_Batman(MF,L_Long,MLook_Long,MAX_MISMATCHES);
 	Init_Batman(MC,L_Long,MLook_Long,MAX_MISMATCHES);
@@ -295,6 +311,7 @@ void *Map(void *T)
 		TD.Least_Mis_In_Junc=INT_MAX;
 		TD.Compiled_Junctions_Ptr=0;
 		TD.Partial_Junctions_Ptr=0;
+		TD.Ext_Array_Ptr=0;
 		TD.Transcript_Number=0;
 		TD.Max_Junc_Count=0;
 
@@ -311,7 +328,18 @@ void *Map(void *T)
 
 		if(!TD.Compiled_Junctions_Ptr)//try junc in the end..
 		{
+			/*char Fwd[File_Info.STRINGLENGTH];
+			for(int i=0;i<File_Info.STRINGLENGTH;i++)
+			{
+				Fwd[i]="ACGT"[Head.Tag[i]];
+			}
+			Extension_Scan(Head.Tag,Fwd,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,1,TD,Err,Head.Quality);//+ strand.. 
+			TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;*/
+			//Scan_Partial_Read(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q);
 			Scan_End_Junc(Head.Tag,File_Info.STRINGLENGTH,TD,Err,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q);
+			//if(!TD.Compiled_Junctions_Ptr)//try junc in the end..
+			//	Scan_Right_Read(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q);
+
 		}
 
 		if(TD.Compiled_Junctions_Ptr)
@@ -343,12 +371,16 @@ void *Map(void *T)
 		}
 		else if(TD.Partial_Junctions_Ptr==1 && TD.Partial_Junctions[0].Junc_Count==1)
 		{
-			if(int Type=Canonical_Score(TD.Partial_Junctions[0].signal))
+			int Type=Canonical_Score(TD.Partial_Junctions[0].signal);
+			//if(File_Info.STRINGLENGTH<80 && Type!=4)
+			//	Type=0;
+			if(Type)
 			{
 				selectedJunctions[0]=0;TD.Partial_Junctions[0].Type=Type;
 				Print_Hits(Head,TD.Partial_Junctions,OUT,SAM[0],Tag_Count,selectedJunctions[0],0,0,Err,Genome_Offsets);//tempType);
-
 			}
+			Head.Quality[File_Info.STRINGLENGTH]=0;
+			SAM[4] <<Head.Description<<endl<<Head.Tag_Copy<<endl<<"+"<<Head.Quality<<endl;
 		}
 	}
 	Join_Tables(Genome_Offsets,Thread_ID);
@@ -367,8 +399,12 @@ void Scan_End_Junc(char* Current_Tag,int StringLength,Transcript_Data & TD,int &
 	Reverse_Quality(RQ,Q,StringLength);
 
 	TD.Compiled_Junctions_Ptr=0;
+	LEN L_Temp=TD.Generic_Hits.L;
+
 	Do_End_Scan(Current_Tag,Fwd,StringLength,1,TD,Err,Q);//+ strand.. 
 	Do_End_Scan(Rev_Bin,Rev,StringLength,0,TD,Err,RQ);//+ strand.. 
+	
+	TD.Generic_Hits.L=L_Temp;
 	TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
 }
 
@@ -392,7 +428,7 @@ void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char
 	}
 
 	Reset_MEMX(TD.Generic_Hits);TD.Generic_Hits.FMIndex=REVERSE;
-	LEN L,L_Temp;L_Temp=TD.Generic_Hits.L;L.IGNOREHEAD=0;
+	LEN L;L.IGNOREHEAD=0;
 	Split_Read(Middle_StringLength,L);TD.Generic_Hits.L=L;
 	TD.Generic_Hits.Current_Tag=Middle_Tag;
 	
@@ -432,7 +468,7 @@ void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char
 			}
 
 			//if(Left_Mis<=MIS_DENSITY)//Left anchors well..
-			if(LScore<=32)//Left anchors well..
+			if(LScore<=QSUM_LIMIT)//Left anchors well..
 			{
 				char Right_Long[EXON_GEN_LEN+1];//Right_Long[EXON_GEN_LEN]=0;
 				char* Ten_Mer=Right_Long;
@@ -485,7 +521,7 @@ void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char
 			}
 
 			//if(Right_Mis<=MIS_DENSITY)//Right anchors well..
-			if(RScore<=32)//Right anchors well..
+			if(RScore<=QSUM_LIMIT)//Right anchors well..
 			{
 				char Left_Long[EXON_GEN_LEN+1];//Right_Long[EXON_GEN_LEN]=0;
 				char* Ten_Mer=Left_Long;
@@ -538,7 +574,6 @@ void Do_End_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,char
 		}
 	}
 
-	TD.Generic_Hits.L=L_Temp;
 	TD.Compiled_Junctions_Ptr=Compiled_Junctions_Ptr;
 }
 
@@ -666,11 +701,11 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 			Cat[j]=0;
 		}
 
-		if(Full_String && PScore<32)
+		if(Full_String && PScore<QSUM_LIMIT)
 		{
 			return 0;
 		}
-		if(PScore>32)
+		if(PScore>QSUM_LIMIT)
 		{
 			Final_Juncs[i].Mismatches==100;
 		}
@@ -966,7 +1001,7 @@ bool Align(char* Source,int StringLength,unsigned Dest_Loc,SARange & R,int Actua
 		int Mis_Count=0;
 		float PScore=0;
 		//for(int i=0;i<StringLength && Mis_Count<=1/*Max mis allowed*/;i++)
-		for(int i=0;i<StringLength && PScore<=32;i++)
+		for(int i=0;i<StringLength && PScore<=QSUM_LIMIT;i++)
 		{
 			assert(Dest[i]<=4 && Dest[i]>=0 && Source[i]<=4 && Source[i]>=0);
 			if(Dest[i]!=Source[i])
@@ -976,7 +1011,7 @@ bool Align(char* Source,int StringLength,unsigned Dest_Loc,SARange & R,int Actua
 			}
 		}
 		//if (Mis_Count>MIS_DENSITY+1)
-		if(PScore>32)
+		if(PScore>QSUM_LIMIT)
 			return false;
 		else
 		{
@@ -988,21 +1023,31 @@ bool Align(char* Source,int StringLength,unsigned Dest_Loc,SARange & R,int Actua
 	}	
 	else
 	{
-		Reset_MEMX(TD.Generic_Hits);TD.Generic_Hits.Hit_Array_Ptr=0;R.Level=1;TD.Generic_Hits.FMIndex=REVERSE;
-		int T_Len=TD.Generic_Hits.L.STRINGLENGTH;TD.Generic_Hits.L.STRINGLENGTH=Actual_Length;
-		int Lo=0;
-		Extend_Forwards(Source,R,/*MAX_MISMATCHES*/MIS_DENSITY,1,StringLength,INT_MAX,revfmi,TD.Generic_Hits,true,Read_Skip,Lo);
-		if(Lo)
+		if(DEEPSCAN && !Read_Skip)
 		{
-			SARange SA;
-			SA=TD.Generic_Hits.Hit_Array[Lo];
-			TD.Generic_Hits.Hit_Array[Lo]=TD.Generic_Hits.Hit_Array[0];
-			TD.Generic_Hits.Hit_Array[0]=SA;
-			assert(SA.Mismatches==R.Mismatches);
+			TD.Generic_Hits.Current_Tag=Source;TD.Generic_Hits.Hit_Array_Ptr=0;TD.Generic_Hits.Hits=0;
+			int Last_Mis=Deep_Scan(TD.Generic_Hits,MIS_DENSITY+1,TD.Generic_Hits.L,fwfmi,revfmi,UINT_MAX);
+			if(TD.Generic_Hits.Hit_Array_Ptr) return true;
+			else return false;
 		}
-		TD.Generic_Hits.L.STRINGLENGTH=T_Len;
-		if(TD.Generic_Hits.Hit_Array_Ptr) return true;
-		else return false;
+		else
+		{
+			Reset_MEMX(TD.Generic_Hits);TD.Generic_Hits.Hit_Array_Ptr=0;R.Level=1;TD.Generic_Hits.FMIndex=REVERSE;
+			int T_Len=TD.Generic_Hits.L.STRINGLENGTH;TD.Generic_Hits.L.STRINGLENGTH=Actual_Length;
+			int Lo=0;
+			Extend_Forwards(Source,R,/*MAX_MISMATCHES*/MIS_DENSITY,1,StringLength,INT_MAX,revfmi,TD.Generic_Hits,true,Read_Skip,Lo);
+			if(Lo)
+			{
+				SARange SA;
+				SA=TD.Generic_Hits.Hit_Array[Lo];
+				TD.Generic_Hits.Hit_Array[Lo]=TD.Generic_Hits.Hit_Array[0];
+				TD.Generic_Hits.Hit_Array[0]=SA;
+				assert(SA.Mismatches==R.Mismatches);
+			}
+			TD.Generic_Hits.L.STRINGLENGTH=T_Len;
+			if(TD.Generic_Hits.Hit_Array_Ptr) return true;
+			else return false;
+		}
 	}
 }
 
@@ -1107,12 +1152,35 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 
 	if(Align(S+Read_Skip,MINX,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip,R,Read_Skip+MINX,Read_Skip,TD,Q+Read_Skip))//Can exact extension be done..
 	{
+		//if(TD.Generic_Hits.Hit_Array_Ptr>100) {TD.Generic_Hits.Hit_Array_Ptr=100;}//Err++;return 0;}
 		std::vector <SARange> Hits(TD.Generic_Hits.Hit_Array_Ptr);
-		for (int i=0;i<TD.Generic_Hits.Hit_Array_Ptr;i++)//Save hits in a vector..
+		int Ptr=0;
+		for (int i=0;DEEPSCAN && Last_Exon==UINT_MAX && i<TD.Generic_Hits.Hit_Array_Ptr;i++)//Save hits in a vector..
 		{
 			assert(TD.Generic_Hits.Hit_Array[i].Start);
-			Hits[i]=TD.Generic_Hits.Hit_Array[i];
+			SARange SA=TD.Generic_Hits.Hit_Array[i];
+			float Score=0;
+			for(int j=0;j<SA.Mismatches;j++)
+			{
+				Score+=Penalty(Q[j+Read_Skip]);
+			}
+			if(Score<32)
+			{
+				Hits[Ptr++]=SA;
+			}
+
 		}
+		if(!Ptr)
+		{
+			for (int i=0;i<TD.Generic_Hits.Hit_Array_Ptr;i++)//Save hits in a vector..
+			{
+				assert(TD.Generic_Hits.Hit_Array[i].Start);
+				Hits[i]=TD.Generic_Hits.Hit_Array[i];
+			}
+		}
+		else
+			TD.Generic_Hits.Hit_Array_Ptr=Ptr;
+
 		unsigned Last_ExonT;int Hit_Count=TD.Generic_Hits.Hit_Array_Ptr-1;
 		for (int i=0;i<=Hit_Count;i++)//Save hits in a vector..
 		{
@@ -1142,6 +1210,15 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-6,TD,Q+Read_Skip-MINX);
 			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-12,TD,Q+Read_Skip-MINX);
 			//Enum_Single_Junctions(S,S+Read_Skip-MINX,Read_Skip,StringLength,(Last_Exon==UINT_MAX) ? UINT_MAX:Last_Exon+Read_Skip-MINX,Inspected_Pairs,R,Junc_Count,Mis_In_Junc_Count,Trans_Array_Ptr,Pre,Suf,Read_Skip-MINX,Err,Sign,3*MINX-15,TD,Q+Read_Skip-MINX);
+		}
+		if(!TD.Compiled_Junctions_Ptr)
+		{
+			if(TD.Ext_Array_Ptr<MAX_JUNCS_ALLOWED)
+			{
+				TD.Ext_Array[TD.Ext_Array_Ptr].Read_Skip=Read_Skip;
+				TD.Ext_Array[TD.Ext_Array_Ptr].Sign=Sign;
+				TD.Ext_Array[TD.Ext_Array_Ptr++].SA=R;
+			}
 		}
 	}
 
@@ -1419,4 +1496,256 @@ bool Mismatch_Hit_Nice(int Mismatch_Scan,MEMX & MF,MEMX & MC,char* Q,int StringL
 		return true;
 	else
 		return false;
+}
+
+/*void Scan_Partial_Read(char* Current_Tag,int StringLength,MEMX & Pre, MEMX & Suf,Transcript_Data & TD,char* Q)
+{
+	char Rev[StringLength],Rev_Bin[StringLength],RQ[MAXTAG];
+	char Fwd[StringLength];
+	for(int i=0;i<StringLength;i++)
+	{
+		Fwd[i]="ACGT"[Current_Tag[i]];
+	}
+	Convert_Reverse(Current_Tag,Rev,Rev_Bin,StringLength);
+	Reverse_Quality(RQ,Q,StringLength);
+
+	TD.Compiled_Junctions_Ptr=0;
+	int Err=0;
+	Partial_Scan(Current_Tag+StringLength-50,Fwd+StringLength-50,50,Pre,Suf,1,TD,Err,Q);//+ strand.. 
+	Partial_Scan(Rev_Bin+StringLength-50,Rev+StringLength-50,50,Pre,Suf,0,TD,Err,RQ);//+ strand.. 
+	TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
+}
+
+void Partial_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,MEMX & Pre,MEMX & Suf,char Sign,Transcript_Data & TD,int & Err,char* Q) 
+{
+	if(Err) return;
+	char* Head_Tag=Current_Tag;
+	int Head_StringLength=StringLength/2;
+	char Org_18_MerR[MINX+1];Org_18_MerR[MINX]=0;
+	
+	for (int i=0;i<MINX;i++)
+	{
+			Org_18_MerR[i]=Current_Tag_ASCII[i+StringLength-MINX];
+	}
+
+	Reset_MEMX(TD.Generic_Hits);TD.Generic_Hits.FMIndex=REVERSE;
+	LEN L,L_Temp;L_Temp=TD.Generic_Hits.L;L.IGNOREHEAD=0;
+	Split_Read(Head_StringLength,L);TD.Generic_Hits.L=L;
+	TD.Generic_Hits.Current_Tag=Head_Tag;
+
+//scan first half..	
+	int Mismatches=Scan(TD.Generic_Hits,2,L,fwfmi,revfmi,0,UINT_MAX);
+	if(Mismatches<0) return;
+
+	char LeftX[100],Right[100];char* Left=LeftX+2;
+	int Compiled_Junctions_Ptr=TD.Compiled_Junctions_Ptr;
+	int Pattern_Match=0,Label=0;
+	Err=0;
+	LEN L18;
+	L18.IGNOREHEAD=0;Split_Read(MINX,L18);//we are scanning MINX-mers...
+	PAIR* Pairs= new PAIR[MAX_HITS_TO_STORE+10];if(!Pairs) {cout << "Seek_Junc(): Error allocatind memory..\n";exit(100);}
+	Junction Final_Juncs[MAX_JUNCS_TO_STORE+1];Final_Juncs[0].p=UINT_MAX;
+	int Inspected_Pairs=0;
+	
+	for(int i=0;TD.Generic_Hits.Hit_Array[i].Start && !Err;i++)
+	{
+		SARange SA=TD.Generic_Hits.Hit_Array[i];
+		assert(SA.Start && TD.Generic_Hits.Hits>0);
+		if(SA.Start==SA.End)
+		{
+			char Read[200];
+			char Read_Head[200];
+			B2C(Current_Tag,Read,StringLength);B2C(Current_Tag,Read_Head,MINX);
+			Inspected_Pairs+=Find_Single_Junc(Read,Read_Head,Current_Tag,Pre,Suf,StringLength,L18,Pairs,Final_Juncs,Err,Label,'+',SA.Start,SA,1);
+		}
+	}
+
+	delete [] Pairs;
+	TD.Generic_Hits.L=L_Temp;
+	TD.Compiled_Junctions_Ptr=Compiled_Junctions_Ptr;
+}*/
+
+const int MAX_LOC=5;
+const int SEED_LEN=14;
+void Scan_Right_Read(char* Current_Tag,int StringLength,MEMX & Pre, MEMX & Suf,Transcript_Data & TD,char* Q)
+{
+	char Rev[StringLength],Rev_Bin[StringLength],RQ[MAXTAG];
+	char Fwd[StringLength];
+	for(int i=0;i<StringLength;i++)
+	{
+		Fwd[i]="ACGT"[Current_Tag[i]];
+	}
+	Convert_Reverse(Current_Tag,Rev,Rev_Bin,StringLength);
+	Reverse_Quality(RQ,Q,StringLength);
+
+	TD.Compiled_Junctions_Ptr=0;
+	int Err=0;
+	Extension_Scan(Current_Tag,Fwd,StringLength,Pre,Suf,1,TD,Err,Q);//+ strand.. 
+	if(!Err)
+		Extension_Scan(Rev_Bin,Rev,StringLength,Pre,Suf,0,TD,Err,RQ);//+ strand.. 
+	TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
+}
+
+void Extension_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,MEMX & Pre,MEMX & Suf,char Sign,Transcript_Data & TD,int & Err,char* Q) 
+{
+	unsigned Loc[MAX_LOC+1];
+	char GTAG[StringLength],ATAC[StringLength],GCAG[StringLength];
+	int GTAG_Ptr=0,GCAG_Ptr=0,ATAC_Ptr=0;
+	for(int r=0;r<TD.Ext_Array_Ptr;r++)
+	{
+		if(TD.Ext_Array[r].Sign !=Sign)
+			continue;
+		SARange SA=TD.Ext_Array[r].SA;
+		assert(SA.FMIndex==REVERSE);
+		int Offset=TD.Ext_Array[r].Read_Skip;
+		int Loc_Ptr=0;
+		if(SA.Start==SA.End)
+		{
+			Loc[Loc_Ptr++]=SA.Start;
+		}
+		else
+		{
+			for(Loc_Ptr=0;SA.Start+Loc_Ptr<=SA.End;Loc_Ptr++)
+			{
+				Loc[Loc_Ptr]=revfmi->textLength-Offset-BWTSaValue(revfmi,SA.Start+Loc_Ptr);
+				if(Loc_Ptr==MAX_LOC)
+				{
+					Err++;
+					return;
+				}
+			}
+		}
+
+		char RightX[EXON_GEN_LEN+1];
+		int GT[StringLength],CT[StringLength],AT[StringLength],GC[StringLength];
+		for(int i=0;i<Loc_Ptr;i++)
+		{
+			int GT_Ptr=0,CT_Ptr=0,AT_Ptr=0,GC_Ptr=0;
+			if(!Get_Bases_ASCII(Loc[i],StringLength-SEED_LEN,RightX))
+			{
+				Err++;return;
+			}
+
+			RightX[StringLength-SEED_LEN]=0;
+			char* Scan_Read=RightX+Offset-1;
+			char* Last_Offset;
+			float Match_Penalty=0;
+			for(int Last_Offset=0;RightX+Last_Offset==Scan_Read;Last_Offset++)
+			{
+				if(*(RightX+Last_Offset)==Current_Tag_ASCII[Last_Offset])
+				{
+					Match_Penalty+=Penalty(Q[Last_Offset]);
+				}
+			}
+
+			while((Scan_Read=strpbrk(Scan_Read+1,"TC")) && (Match_Penalty<QSUM_LIMIT))
+			{
+				for(int Last_Offset=0;RightX+Last_Offset==Scan_Read;Last_Offset++)
+				{
+					if(*(RightX+Last_Offset)==Current_Tag_ASCII[Last_Offset])
+					{
+						Match_Penalty+=Penalty(Q[Last_Offset]);
+					}
+				}
+				if(Match_Penalty>=QSUM_LIMIT)
+					continue;
+
+				char Prec=*(Scan_Read-1);
+				assert(Prec=='A'||Prec=='C'||Prec=='G'||Prec=='T');
+				if(*Scan_Read=='T')
+				{
+					switch(Prec)
+					{
+						case 'A':
+							AT[AT_Ptr++]=Scan_Read-RightX-1;
+							break;
+						case 'C':
+							CT[CT_Ptr++]=Scan_Read-RightX-1;
+							break;
+						case 'G':
+							GT[GT_Ptr++]=Scan_Read-RightX-1;
+					}
+				}
+				else
+				{
+					if(Prec=='G')
+					{
+						GC[GC_Ptr]=Scan_Read-RightX-1;
+					}
+				}
+			}
+
+			if(GC_Ptr+GT_Ptr+CT_Ptr+AT_Ptr)//Motifs present..
+			{
+				if(!Get_Bases_ASCII(Loc[i]+StringLength-SEED_LEN,EXON_GEN_LEN-StringLength+SEED_LEN,RightX+StringLength-SEED_LEN))//load rest..
+				{
+					Err++;return;
+				}
+				RightX[EXON_GEN_LEN]=0;
+				char Signal[5];Signal[4]=0;
+
+				if(GT_Ptr)
+				{
+					Signal[0]='G';Signal[1]='T';
+					Seek_Residue(GT_Ptr,GT,Current_Tag_ASCII,StringLength,RightX,Q,Signal,Loc[i],TD,Sign);
+				}
+				if(CT_Ptr)
+				{
+					Signal[0]='C';Signal[1]='T';
+					Seek_Residue(CT_Ptr,CT,Current_Tag_ASCII,StringLength,RightX,Q,Signal,Loc[i],TD,Sign);
+				}
+
+
+			}
+
+			/*Ann_Info A1;
+			Location_To_Genome(Loc[r],A1);
+			cout<<A1.Name<<"\t"<<Loc[r]<<endl;*/
+			
+		}
+		
+	}
+}
+
+void Seek_Residue(int & GT_Ptr,int *GT,char* Current_Tag_ASCII,int StringLength,char* RightX,char* Q,char *Signal,unsigned Loc,Transcript_Data & TD,char Sign)
+{
+	char Seed[SEED_LEN+1];Seed[SEED_LEN]=0;
+	char* Locate;
+	for(int i=0;i<GT_Ptr;i++)
+	{
+		memcpy(Seed,Current_Tag_ASCII+GT[i],SEED_LEN);
+		Locate=RightX+StringLength;
+		while(Locate=strstr(Locate+1,Seed))
+		{
+			float Score=0;
+			int Mis=0,j=0;
+			for(int k=GT[i];k<StringLength && Score<QSUM_LIMIT;k++,j++)
+			{
+				if(Locate[j]!=Current_Tag_ASCII[k])
+				{
+					Mis++;
+					Score+=Penalty(Q[k]);
+				}
+			}
+			if(Score<QSUM_LIMIT)
+			{
+				Signal[2]=*(Locate-2);
+				Signal[3]=*(Locate-1); 
+				if(int Type=Canonical_Score(Signal))
+				{
+					Junction J;
+					J.Label=TD.Compiled_Junctions_Ptr;
+					J.Junc_Count=1;J.ID=INT_MAX-1;J.Sign=Sign;J.Type=Type;
+					J.p = Loc + StringLength-j;
+					J.q = Loc + Locate-RightX-1;
+					J.r = StringLength-j;
+					strcpy(J.signal,Signal);
+					if(TD.Compiled_Junctions_Ptr<MAX_JUNCS_ALLOWED)
+					{
+						TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr++]=J;
+					}
+				}
+			}
+		}
+	}
 }

@@ -3,6 +3,7 @@
 #include <stdio.h> 
 #include "string.h"
 #include "const.h"
+#include "qcalc.h"
 #define FALSE 0
 extern int THREAD;
 extern int INIT_MIS_SCAN;
