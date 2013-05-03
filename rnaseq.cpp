@@ -119,7 +119,7 @@ Index_Info Genome_Files;
 MMPool *mmPool;
 RANGEINDEX Range_Index;
 unsigned SOURCELENGTH;
-gzFile Input_File,Mate_File;
+FILE *Input_File,*Mate_File;
 FILETYPE File_Info;
 
 int THREAD = 0;
@@ -159,7 +159,7 @@ int Seek_All_Junc(char* Current_Tag,int StringLength,MEMX & MF_Pre,MEMX & MF_Suf
 int Find_Single_Junc(char* Read,char* Read_Head,char* Converted_Read,MEMX & MF_Pre,MEMX & MF_Suf,int STRINGLENGTH,LEN & L,PAIR* & Pairs,Junction *Final_Juncs,int & Err,int & Label,char Sign,unsigned Anchor,SARange & R,int Skip);
 void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int StringLength, unsigned Anchor,int & Inspected_Pairs,SARange & R,int Junc_Count,int Mis_In_Junc_Count,int & Trans_Array_Ptr,MEMX & Pre,MEMX & Suf,int Skip,int & Err,int Sign,int Fragment,Transcript_Data & TD,char* Q);
 void Load_All_Indexes(Index_Info Genome_Files,BWT* & fwfmi,BWT* & revfmi,MMPool* & mmPool,RANGEINDEX & Range_Index);
-void Init(BWT *revfmi,unsigned & SOURCELENGTH,PAIR* & Pairs,gzFile & Input_File,gzFile & Mate_File,FILETYPE & File_Info,Parameters & CL,FILE* & OUT,Index_Info & Genome_Files);
+void Init(BWT *revfmi,unsigned & SOURCELENGTH,PAIR* & Pairs,FILE* & Input_File,FILE* & Mate_File,FILETYPE & File_Info,Parameters & CL,FILE* & OUT,Index_Info & Genome_Files);
 bool  Progress_Bar(Parameters & CL,unsigned & Number_of_Tags,unsigned & Progress,unsigned & Tag_Count,FILETYPE & File_Info);
 int Find_Pairings(int & Pairs_Index,SARange* MF_Pre_Hits,SARange* MF_Suf_Hits,PAIR* &  Pairs, char* Read,char* Read_Head,int STRINGLENGTH,int & Final_Juncs_Ptr,Junction *Final_Juncs,int & Min_Mismatch,int Mis_In_Head,int Mis_In_Tail,int Skip,int & Label,char Sign);
 void Open_Outputs(ofstream & SAM,string filename);

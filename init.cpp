@@ -13,7 +13,7 @@ extern std::map <unsigned, Ann_Info> Annotations;
 extern unsigned Location_Array[80];
 extern pthread_mutex_t OpenGenomeFileslock;
 
-void Init(BWT *revfmi,unsigned & SOURCELENGTH,gzFile & Input_File,gzFile & Mate_File,FILETYPE & File_Info,Parameters & CL,Index_Info & Genome_Files,int & INIT_MIS_SCAN)
+void Init(BWT *revfmi,unsigned & SOURCELENGTH,FILE* & Input_File,FILE* & Mate_File,FILETYPE & File_Info,Parameters & CL,Index_Info & Genome_Files,int & INIT_MIS_SCAN)
 {
 	EXONGAP=CL.EXONGAP;
 	SOURCELENGTH = revfmi->textLength;

@@ -65,7 +65,7 @@ int READLEN,ORG_STRINGLENGTH;
 char Char_To_CodeC[256];
 char Char_To_Code[256];
 
-gzFile Input_File,Mate_File;
+FILE *Input_File,*Mate_File;
 //---------------RQ stuff -------------------------
 unsigned RQ_Hits;
 SA* SA_Index;
@@ -77,7 +77,7 @@ int RESIDUE=5;
 
 void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL);
 void Load_FM_Indexes(Index_Info Genome_Files,BWT* & fwfmi,BWT* & revfmi,MMPool* & mmPool);
-void InitX(BWT *revfmi,unsigned & SOURCELENGTH,gzFile & Input_File,gzFile & Mate_File,FILETYPE & File_Info,Parameters & CL,Index_Info & Genome_Files,int & MAX_MISMATCHES);
+void InitX(BWT *revfmi,unsigned & SOURCELENGTH,FILE* & Input_File,FILE* & Mate_File,FILETYPE & File_Info,Parameters & CL,Index_Info & Genome_Files,int & MAX_MISMATCHES);
 void Convert_Reverse(char* Read,char * RC_Read,char* RC_Bin,int StringLength);
 bool  Progress_Bar(Parameters & CL,unsigned & Number_of_Tags,unsigned & Progress,unsigned & Tag_Count,FILETYPE & File_Info);
 void Launch_Threads(int NTHREAD, void* (*Map_t)(void*),Thread_Arg T);
@@ -163,7 +163,6 @@ void *Map(void *T)
 
 		int Label=0;
 		Actual_Tag++;
-		continue;
 
 		char Rev_Bin[MAXTAG],Rev[MAXTAG];
 		Convert_Reverse(Head.Tag,Rev,Rev_Bin,File_Info.STRINGLENGTH);
@@ -417,7 +416,7 @@ void Load_FM_Indexes(Index_Info Genome_Files,BWT* & fwfmi,BWT* & revfmi,MMPool* 
 }
 
 
-void InitX(BWT *revfmi,unsigned & SOURCELENGTH,gzFile & Input_File,gzFile & Mate_File,FILETYPE & File_Info,Parameters & CL,Index_Info & Genome_Files,int & INIT_MIS_SCAN)
+void InitX(BWT *revfmi,unsigned & SOURCELENGTH,FILE* & Input_File,FILE* & Mate_File,FILETYPE & File_Info,Parameters & CL,Index_Info & Genome_Files,int & INIT_MIS_SCAN)
 {
 	EXONGAP=CL.EXONGAP;
 	SOURCELENGTH = revfmi->textLength;

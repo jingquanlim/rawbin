@@ -64,20 +64,20 @@ gzFile File_OpenZ(const char* File_Name,const char* Mode)
  *  Description:  Detects file type and lengths of input file(s)
  * =====================================================================================
  */
-void Detect_Input(FILETYPE & P, gzFile Input_File,gzFile Mate_File)
+void Detect_Input(FILETYPE & P, FILE* & Input_File,FILE* & Mate_File)
 {
 	char Description[MAXDES+1];
 	char Current_Tag[MAXTAG+1];
 	char Quality[MAXTAG+1];
 
-	if (gzgets(Input_File,Description,MAXDES)!=0)//Measure tag length
+	if (fgets(Description,MAXDES,Input_File)!=0)//Measure tag length
 	{
-		gzgets(Input_File,Current_Tag,MAXTAG);
+		fgets(Current_Tag,MAXTAG,Input_File);
 		for(P.TAG_COPY_LEN=0;Current_Tag[P.TAG_COPY_LEN]!='\n' && Current_Tag[P.TAG_COPY_LEN]!='\r' && Current_Tag[P.TAG_COPY_LEN]!=0;P.TAG_COPY_LEN++);//TAG_COPY_LEN++;
 		if(Patternfile_Count)
 		{
-			gzgets(Mate_File,Description,MAXDES);
-			Current_Tag[P.TAG_COPY_LEN++]='\t';gzgets(Mate_File,Current_Tag+P.TAG_COPY_LEN,MAXTAG);
+			fgets(Description,MAXDES,Mate_File);
+			Current_Tag[P.TAG_COPY_LEN++]='\t';fgets(Current_Tag+P.TAG_COPY_LEN,MAXTAG,Mate_File);
 			for(P.TAG_COPY_LEN=0;Current_Tag[P.TAG_COPY_LEN]!='\n' && Current_Tag[P.TAG_COPY_LEN]!='\r' && Current_Tag[P.TAG_COPY_LEN]!=0;P.TAG_COPY_LEN++);//TAG_COPY_LEN++;
 		}
 		for(P.STRINGLENGTH=0;Current_Tag[P.STRINGLENGTH]!='\n' && Current_Tag[P.STRINGLENGTH]!='\r' && Current_Tag[P.STRINGLENGTH]!=0 && Current_Tag[P.STRINGLENGTH]!=PAIR_END_SEPERATOR;P.STRINGLENGTH++);
@@ -88,26 +88,25 @@ void Detect_Input(FILETYPE & P, gzFile Input_File,gzFile Mate_File)
 			P.PAIR_LENGTH_LEFT=P.STRINGLENGTH;
 
 			for(P.PAIR_LENGTH_RIGHT=0;Current_Tag[P.STRINGLENGTH+1+P.PAIR_LENGTH_RIGHT]!='\n' && Current_Tag[P.STRINGLENGTH+1+P.PAIR_LENGTH_RIGHT]!='\r' && Current_Tag[P.STRINGLENGTH+1+P.PAIR_LENGTH_RIGHT]!=0;P.PAIR_LENGTH_RIGHT++);
-			gzgets(Input_File,Quality,MAXTAG);//plus
+			fgets(Quality,MAXTAG,Input_File);//plus
 			if (Quality[0]=='>') P.FILETYPE=FA;else P.FILETYPE=FQ;
 			if (P.FILETYPE == FQ && Quality[0] != '+' && Description[0] != '@') {printf("Init_Variables: Cannot determine file type ...\n");exit(1);}
 		}
 		else
 		{
 			P.NORMAL_TAGS=TRUE;
-			gzgets(Input_File,Quality,MAXTAG);//plus
+			fgets(Quality,MAXTAG,Input_File);//plus
 			if (Quality[0]=='>') P.FILETYPE=FA;else P.FILETYPE=FQ;
 			if (P.FILETYPE == FQ && Quality[0] != '+' && Description[0] != '@') {printf("Init_Variables: Cannot determine file type ...\n");exit(1);}
-			gzgets(Input_File,Quality,MAXTAG);//phred
+			fgets(Quality,MAXTAG,Input_File);//phred
 		}
 
-		gz_stream *s=(gz_stream*)Input_File;
-		fseek(s->file, 0L, SEEK_END);
-		P.File_Size = ftello64(s->file);
-		P.Org_File=s->file;
+		fseek(Input_File, 0L, SEEK_END);
+		P.File_Size = ftello64(Input_File);
+		P.Org_File=Input_File;
 
-		gzseek(Input_File,0,SEEK_SET);//go top
-		if(!P.NORMAL_TAGS) gzseek(Mate_File,0,SEEK_SET);//go top
+		fseek(Input_File,0,SEEK_SET);//go top
+		//if(!P.NORMAL_TAGS) fseek(Mate_File,0,SEEK_SET);//go top
 	}
 	READLEN=P.TAG_COPY_LEN;
 	ORG_STRINGLENGTH=READLEN;
@@ -120,23 +119,22 @@ void Detect_Input(FILETYPE & P, gzFile Input_File,gzFile Mate_File)
  * =====================================================================================
  */
 
-char Read_Tag(READ & Head,READ & Tail,gzFile Input_File,gzFile Mate_File,FILETYPE & F)
+char Read_Tag(READ & Head,READ & Tail,FILE* & Input_File,FILE* & Mate_File,FILETYPE & F)
 {
-	gz_stream *s=(gz_stream*)Input_File;
-	flockfile(s->file);
+	flockfile(Input_File);
 	char * Current_Tag;
 	static int Random_Pointer=0;
 
 	Current_Tag=Head.Tag;
-	if (gzgets(Input_File,Head.Description,MAXDES)!=0)// read a tag...
+	if (fgets(Head.Description,MAXDES,Input_File)!=0)// read a tag...
 	{
-		gzgets(Input_File,Head.Tag,MAXDES);//tag
+		fgets(Head.Tag,MAXDES,Input_File);//tag
 		if (F.FILETYPE == FQ)
 		{
-			gzgets(Input_File,Head.Plus,MAXTAG);//plus
-			gzgets(Input_File,Head.Quality,MAXTAG);//phred
+			fgets(Head.Plus,MAXTAG,Input_File);//plus
+			fgets(Head.Quality,MAXTAG,Input_File);//phred
 		}
-		funlockfile(s->file);
+		funlockfile(Input_File);
 		strcpy(Head.Tag_Copy,Head.Tag);
 		Head.NCount=0;int j=0;
 		for (unsigned i=0;i<=F.STRINGLENGTH-1;i++)
@@ -160,7 +158,7 @@ char Read_Tag(READ & Head,READ & Tail,gzFile Input_File,gzFile Mate_File,FILETYP
 	} 
 	else 
 	{
-		funlockfile(s->file);
+		funlockfile(Input_File);
 		return FALSE;
 	}
 	if(F.NORMAL_TAGS) 
@@ -170,13 +168,13 @@ char Read_Tag(READ & Head,READ & Tail,gzFile Input_File,gzFile Mate_File,FILETYP
 	
 
 	Current_Tag=Tail.Tag;
-	if (gzgets(Mate_File,Tail.Description,MAXDES)!=0)// read a tag...
+	/*if (fgets(Mate_File,Tail.Description,MAXDES)!=0)// read a tag...
 	{
-		gzgets(Mate_File,Tail.Tag,MAXDES);//tag
+		fgets(Mate_File,Tail.Tag,MAXDES);//tag
 		if (F.FILETYPE == FQ)
 		{
-			gzgets(Mate_File,Tail.Plus,MAXTAG);//plus
-			gzgets(Mate_File,Tail.Quality,MAXTAG);//phred
+			fgets(Mate_File,Tail.Plus,MAXTAG);//plus
+			fgets(Mate_File,Tail.Quality,MAXTAG);//phred
 		}
 		strcpy(Tail.Tag_Copy,Tail.Tag);
 		Tail.NCount=0;int j=0;
@@ -196,13 +194,13 @@ char Read_Tag(READ & Head,READ & Tail,gzFile Input_File,gzFile Mate_File,FILETYP
 		Tail.Complement[F.STRINGLENGTH]='-';
 		Current_Tag=Head.Tag;
 		return TRUE;
-	} else {printf("Read_Tag():Unpaired read...!\n");exit(0);};
+	} else {printf("Read_Tag():Unpaired read...!\n");exit(0);};*/
 }
 
 
 
-void Open_Files(gzFile & Input_File,gzFile & Mate_File,Parameters P)
+void Open_Files(FILE* & Input_File,FILE* & Mate_File,Parameters P)
 {
-	Input_File=File_OpenZ(P.PATTERNFILE,"r");//Load tags
-	if(P.Patternfile_Count) Mate_File=File_OpenZ(P.PATTERNFILE1,"r");//Load tags
+	Input_File=File_Open(P.PATTERNFILE,"r");//Load tags
+	if(P.Patternfile_Count) Mate_File=File_Open(P.PATTERNFILE1,"r");//Load tags
 }

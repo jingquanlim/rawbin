@@ -42,7 +42,7 @@ FILE* File_Open(const char* File_Name,const char* Mode);
 FILE* File_Exist_Open(const char* File_Name);
 gzFile File_OpenZ(const char* File_Name,const char* Mode);
 unsigned Get_File_Size(FILE* File);
-void Detect_Input(FILETYPE & P, gzFile Input_File,gzFile Mate_File);
-char Read_Tag(READ & Head,READ & Tail,gzFile Input_File,gzFile Mate_File,FILETYPE & F);
-void Open_Files(gzFile & Input_File,gzFile & Mate_File,Parameters P);
+void Detect_Input(FILETYPE & P, FILE* & Input_File,FILE* & Mate_File);
+char Read_Tag(READ & Head,READ & Tail,FILE* & Input_File,FILE* & Mate_File,FILETYPE & F);
+void Open_Files(FILE* & Input_File,FILE* & Mate_File,Parameters P);
 #endif
