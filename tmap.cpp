@@ -19,7 +19,7 @@
 #include <fstream>
 #include <iostream>
 //#include "Print.h"
-#include "init.h"
+//#include "init.h"
 #include <vector> 
 #include <math.h>
 #include <pthread.h>
@@ -73,6 +73,7 @@ int* SA_Blocks;
 char COMPRESS;
 int INDEX_RESOLUTION=30000;
 int EXONGAP;
+int RESIDUE=5;
 
 void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL);
 void Load_FM_Indexes(Index_Info Genome_Files,BWT* & fwfmi,BWT* & revfmi,MMPool* & mmPool);
@@ -83,6 +84,9 @@ void Launch_Threads(int NTHREAD, void* (*Map_t)(void*),Thread_Arg T);
 int Map_Read(MEMX & MF,MEMX & MC,int MAX_MISMATCHES, LEN & L,BWT* fwfmi,BWT* revfmi,int Next_Mis,int Max_Hits);
 void *Map(void *T);
 void Set_Affinity();
+void Process_Hits(MEMX & MF,MEMX & MC,int StringLength,ofstream & Out_File,ofstream & Mishit_File,READ & Head);
+void Open_Outputs(ofstream & SAM,string filename);
+bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & Out_File,string Des);
 
 int main(int argc, char* argv[])
 {
@@ -142,14 +146,18 @@ void *Map(void *T)
 	Init_Batman(MC,L,MLook,MAX_MISMATCHES);
 //--------------------- Setup Data Structure for Batman End----------------------------------------
 	
+	ofstream Mishit_File,Out_File;
+	string Mishit_File_Name = "rejected",Out_File_Name="trans";
+	Open_Outputs(Mishit_File, Mishit_File_Name+Str_Thread_ID+".fq");
+	Open_Outputs(Out_File, Out_File_Name+Str_Thread_ID+".sam");
 
-//--------------------- Load probability information --------------------------
 
 	fprintf(stderr,"======================]\r[");//progress bar....
 	int Actual_Tag=0;
 	READ Head,Tail;
 	while (Read_Tag(Head,Tail,Input_File,Mate_File,File_Info))
 	{
+		if(Head.NCount>2) continue;
 		if(Thread_ID==1 && !Progress_Bar(CL,Number_of_Tags,Progress,Tag_Count,File_Info)) break;
 		if(CL.MAX_TAGS_TO_PROCESS && CL.MAX_TAGS_TO_PROCESS<Actual_Tag) break;
 
@@ -161,7 +169,51 @@ void *Map(void *T)
 		MF.Hits=0;MF.Hit_Array_Ptr=0;MF.Current_Tag=Head.Tag;//setup read details to alignmentstructure..
 		MC.Hits=0;MC.Hit_Array_Ptr=0;MC.Current_Tag=Rev_Bin;MC.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
 		int Mismatch_Scan=Map_Read(MF,MC,MAX_MISMATCHES,L,fwfmi,revfmi,0,2);
+		if(Mismatch_Scan>=0)
+		{
+			Process_Hits(MF,MC,File_Info.STRINGLENGTH,Out_File,Mishit_File,Head);
+		}
 	}
+}
+
+void Process_Hits(MEMX & MF,MEMX & MC,int StringLength,ofstream & Out_File,ofstream & Mishit_File,READ & Head)
+{
+	int Plus_Hits=0,Minu_Hits=0;
+	if(MF.Hit_Array_Ptr+MC.Hit_Array_Ptr!=1) //Multiple hits..
+		return;
+	
+	Ann_Info A;
+	unsigned Loc;
+	SARange SA;
+	if(MF.Hit_Array_Ptr)
+	{
+		SA=MF.Hit_Array[0];
+	}
+	else
+		SA=MC.Hit_Array[0];
+
+	if(SA.Start==SA.End)
+	{
+		Loc=SA.Start;
+
+	}
+	else//Multiple Hits..
+	{
+		return;
+		Loc=Conversion_Factor-BWTSaValue(revfmi,SA.Start);
+	}
+
+	Location_To_Genome(Loc,A);
+	if (Loc+StringLength > A.Size)//check for a Boundary Hit..
+	{
+		//string Des=A.Name;
+		//Out_File<<A.Name<<":"<<Loc<<endl;
+		*strchr(Head.Description,'\n')=0;
+		string Des=Head.Description;
+		char Name[300];strcpy(Name,A.Name);
+		Call_Junc(Name,Loc,StringLength,Out_File,Des);
+	}
+
 }
 
 option Long_Options[]=
@@ -368,8 +420,6 @@ void InitX(BWT *revfmi,unsigned & SOURCELENGTH,gzFile & Input_File,gzFile & Mate
 {
 	EXONGAP=CL.EXONGAP;
 	SOURCELENGTH = revfmi->textLength;
-	CONVERSION_FACTOR=revfmi->textLength;//+1;
-	Conversion_Factor=revfmi->textLength;
 	Char_To_Code['N']=0;Char_To_Code['n']=0;
 	Char_To_Code['A']=0;Char_To_Code['C']=1;Char_To_Code['G']=2;Char_To_Code['T']=3;
 	Char_To_Code['a']=0;Char_To_Code['c']=1;Char_To_Code['g']=2;Char_To_Code['t']=3;
@@ -381,6 +431,9 @@ void InitX(BWT *revfmi,unsigned & SOURCELENGTH,gzFile & Input_File,gzFile & Mate
 
 	Open_Files(Input_File,Mate_File,CL);
 	Detect_Input(File_Info,Input_File,Mate_File);
+
+	CONVERSION_FACTOR=revfmi->textLength-File_Info.STRINGLENGTH;
+	Conversion_Factor=revfmi->textLength-File_Info.STRINGLENGTH;
 	
 	if(INIT_MIS_SCAN==-1)
 	{
@@ -397,6 +450,7 @@ void InitX(BWT *revfmi,unsigned & SOURCELENGTH,gzFile & Input_File,gzFile & Mate
 			INIT_MIS_SCAN=3;
 		}
 	}
+	cout <<"Scanning @ " <<INIT_MIS_SCAN<<"Mismatches\n";
 }
 
 /* 
@@ -550,8 +604,90 @@ Five:
 	}
 
 	MF.Hit_Array[MF.Hit_Array_Ptr].Start=0;//MC.Hit_Array[MC.Hit_Array_Ptr].Start=0;//tag sentinels to sa lists..
-	MF.Hit_Array_Ptr++;//MC.Hit_Array_Ptr++;//Setup for suboptimal hits..
+	//MF.Hit_Array_Ptr++;//MC.Hit_Array_Ptr++;//Setup for suboptimal hits..
 	assert(In_Mis <= MAX_MISMATCHES);
 	//Top=Hits;
 	return (Hits ? In_Mis : -1) ;
+}
+
+void Open_Outputs(ofstream & SAM,string filename)
+{
+	SAM.open(filename.c_str());
+	if(SAM.is_open())
+	{
+		return;
+	}
+	else
+	{
+		cout <<"File open error\n";
+		exit(100);
+	}
+}
+
+//-----------------------------------------------------------------------------------------------------------------------------------
+
+bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & Out_File,string Des)
+{
+	//assert (L.c_str());// && DesS.c_str());
+	char Dummy[5000],Right[500],Left[500],Chr[20],Strand[3];//,Read[500],SignM;
+	unsigned RightL,LeftL,RightR,LeftR;
+
+	/*char *token = strtok (Junc, ",");
+	sscanf (token, "%s", Left);
+	token = strtok (NULL,",");
+	if(token)
+	{
+		    sscanf (token, "%s", Right);
+	}
+	else {Right[0]=0;}*/
+
+	//char *token;
+	char *token= strchr (Junc, ',');
+	if(!token) 
+		return 0;
+	*token=0;
+	sscanf (Junc, "%s", Left);
+	sscanf (token+1, "%s", Right);
+
+	if(!Right[0] || 'E'==Right[0]|| '<'==Right[0])
+	{
+		return 0;
+	}
+	else
+	{
+		sscanf(Left,"%[^:]%*c%u%*c%u%s",Chr,&LeftL,&LeftR,Strand);
+		sscanf(Right,"%*[^:]%*c%u%*c%u%s",&RightL,&RightR,Strand);
+		char Sign=Strand[1];
+		assert(LeftL>0 && LeftR >0 && RightL >0 && RightR>0 && (Sign=='+' || Sign=='-'));
+
+		int Left_Gap=LeftR-(LeftL+Pos);
+		assert(Left_Gap >0);
+		if ((Left_Gap<RESIDUE) || (Left_Gap>StringLength-RESIDUE))
+		{
+			return 0;
+		}
+		else
+		{
+
+			bool Skip_Hit=false;
+			if(!Skip_Hit)
+			{
+				int Left_Cord=LeftR-3;int Right_Cord=RightL+3;
+				int Gap=Right_Cord-Left_Cord-3;
+				assert(Gap >0);
+				Out_File \
+					<<Chr<<"\t"<<Left_Cord<<"\t"<<Right_Cord<<"\t" \
+					<<"JUNCXXX\t1000\t+\t" \
+					<<Left_Cord<<"\t"<<Right_Cord-1 \
+					<<"\t255,0,\t2\t3,3\t0," \
+					<<Gap<<endl;
+				/*cout \
+					<< Des <<"\t" \
+					<<Left<<"\t"<<Right<<"\t"<<Pos<<endl;*/
+				return 1;
+			}
+			else return 0;
+		}
+	}
+	return true;
 }

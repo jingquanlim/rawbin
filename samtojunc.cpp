@@ -239,6 +239,7 @@ bool Call_Junc(string & L,string & DesS)
 				int Gap=Right_Cord-Left_Cord-3;
 				assert(Gap >0);
 				printf("%s\t%u\t%u\t%s\t1000\t%c\t%u\t%u\t255,0,\t2\t3,3\t0,%d\n",Chr,Left_Cord,Right_Cord,Des,Sign,Left_Cord,Right_Cord-1,Gap);
+				//printf("%s\t%s\t%s\t%u\n",Des,Left,Right,Pos);
 				return 1;
 			}
 			else return 0;

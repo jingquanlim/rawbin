@@ -3937,7 +3937,7 @@ int Load_Location(char* LOCATIONFILE, map <unsigned, Ann_Info> & Annotations,uns
 		Off_Cum+=Off;
 
 		fgets(Genome_Name_Buf,300,Location_File);
-		for(int i=0;i<40;i++) 
+		for(int i=0;i<300;i++) 
 		{
 			if (Genome_Name_Buf[i] == '\n' ||Genome_Name_Buf[i] == '\r')
 			{ 
