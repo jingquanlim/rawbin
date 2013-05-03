@@ -136,6 +136,7 @@ char Read_Tag(READ & Head,READ & Tail,gzFile Input_File,gzFile Mate_File,FILETYP
 			gzgets(Input_File,Head.Plus,MAXTAG);//plus
 			gzgets(Input_File,Head.Quality,MAXTAG);//phred
 		}
+		funlockfile(s->file);
 		strcpy(Head.Tag_Copy,Head.Tag);
 		Head.NCount=0;int j=0;
 		for (unsigned i=0;i<=F.STRINGLENGTH-1;i++)
@@ -164,7 +165,6 @@ char Read_Tag(READ & Head,READ & Tail,gzFile Input_File,gzFile Mate_File,FILETYP
 	}
 	if(F.NORMAL_TAGS) 
 	{
-		funlockfile(s->file);
 		return TRUE;
 	}
 	

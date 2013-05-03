@@ -163,6 +163,7 @@ void *Map(void *T)
 
 		int Label=0;
 		Actual_Tag++;
+		continue;
 
 		char Rev_Bin[MAXTAG],Rev[MAXTAG];
 		Convert_Reverse(Head.Tag,Rev,Rev_Bin,File_Info.STRINGLENGTH);
