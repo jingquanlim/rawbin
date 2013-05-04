@@ -654,11 +654,21 @@ void Open_Outputs(ofstream & SAM,string filename)
 
 //-----------------------------------------------------------------------------------------------------------------------------------
 
+struct Junc_Info
+{
+	unsigned Right_Cord;
+	unsigned Left_Cord;
+	int Gap;
+};
+const int MAX_JUNC=4;
+
 bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* Des,char Read_Sign,READ & Head)
 {
 	//assert (L.c_str());// && DesS.c_str());
 	char Chr[20],Strand[3];//,Read[500],SignM;
 	unsigned RightL,LeftL,RightR,LeftR;
+	Junc_Info J[MAX_JUNC];int J_Ptr=0;
+
 
 	if(!Split_Boundry(Junc,Chr,LeftL,LeftR,RightL,RightR,Strand))
 	{
@@ -667,60 +677,67 @@ bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & OUT_FILE,ofst
 	else
 	{
 		char Sign=Strand[1];
+		
 		assert(LeftL>0 && LeftR >0 && RightL >0 && RightR>0 && (Sign=='+' || Sign=='-'));
 
 		int Left_Gap=LeftR-(LeftL+Pos);
-		assert(Left_Gap >0);
+		int Right_Gap=RightR-RightL;
+		assert(Left_Gap >0 && Right_Gap>0);
+		if(Left_Gap+Right_Gap<StringLength)
+		{
+			//cout<<"third\n";
+		}
 		if ((Left_Gap<RESIDUE) || (Left_Gap>StringLength-RESIDUE))
 		{
 			return 0;
 		}
 		else
 		{
+			J[J_Ptr].Left_Cord=LeftR-3;
+			J[J_Ptr].Right_Cord=RightL+3;
+			J[J_Ptr].Gap=J[J_Ptr].Right_Cord-J[J_Ptr].Left_Cord-3;
+			assert(J[J_Ptr].Gap >0);
+			if(++J_Ptr==MAX_JUNC)
+				return false;
 
-			bool Skip_Hit=false;
-			if(!Skip_Hit)
-			{
-				int Left_Cord=LeftR-3;int Right_Cord=RightL+3;
-				int Gap=Right_Cord-Left_Cord-3;
-				assert(Gap >0);
-
-				OUT_FILE \
-					<<Chr<<"\t"<<Left_Cord<<"\t"<<Right_Cord<<"\t" \
-					<<"JUNCXXX\t1000\t+\t" \
-					<<Left_Cord<<"\t"<<Right_Cord-1 \
-					<<"\t255,0,\t2\t3,3\t0," \
-					<<Gap<<endl;
-
-				Head.Tag_Copy[StringLength]=Head.Quality[StringLength]=0;*(strchr(Des,'\n'))=0;
-				int Flag;char *Seq,*Qual,R_Seq[MAXTAG],R_Qual[MAXTAG];
-				if(Read_Sign=='+')
-				{
-					Flag=0;
-					Seq=Head.Tag_Copy;
-					Qual=Head.Quality;
-				}
-				else
-				{
-					Flag=16;
-					Convert_Reverse_Str(Head.Tag_Copy,R_Seq,StringLength);Seq=R_Seq;
-					Rev_Str(R_Qual,Head.Quality,StringLength);Qual=R_Qual;
-					R_Seq[StringLength]=R_Qual[StringLength]=0;
-				}
-				SAM_FILE \
-					<< Des+1 <<"\t" \
-					<< Flag <<"\t" \
-					<<Chr<<"\t"<<LeftL+Pos+1 <<"\t" \
-					<< 60 <<"\t" 
-					<<LeftR-LeftL-Pos<<"M"<<RightL-LeftR<<"N"<<StringLength-(LeftR-LeftL-Pos)<<"M\t"
-					<< "*\t0\t0\t" 
-					<< Seq << "\t" 
-					<< Qual <<endl;
-				return 1;
-			}
-			else return 0;
 		}
 	}
+
+	for(int i=0;i<J_Ptr;i++)
+	{
+		OUT_FILE \
+			<<Chr<<"\t"<<J[i].Left_Cord<<"\t"<<J[i].Right_Cord<<"\t" \
+			<<"JUNCXXX\t1000\t+\t" \
+			<<J[i].Left_Cord<<"\t"<<J[i].Right_Cord-1 \
+			<<"\t255,0,\t2\t3,3\t0," \
+			<<J[i].Gap<<endl;
+	}
+
+	Head.Tag_Copy[StringLength]=Head.Quality[StringLength]=0;*(strchr(Des,'\n'))=0;
+	int Flag;char *Seq,*Qual,R_Seq[MAXTAG],R_Qual[MAXTAG];
+	if(Read_Sign=='+')
+	{
+		Flag=0;
+		Seq=Head.Tag_Copy;
+		Qual=Head.Quality;
+	}
+	else
+	{
+		Flag=16;
+		Convert_Reverse_Str(Head.Tag_Copy,R_Seq,StringLength);Seq=R_Seq;
+		Rev_Str(R_Qual,Head.Quality,StringLength);Qual=R_Qual;
+		R_Seq[StringLength]=R_Qual[StringLength]=0;
+	}
+
+	SAM_FILE \
+		<< Des+1 <<"\t" \
+		<< Flag <<"\t" \
+		<<Chr<<"\t"<<LeftL+Pos+1 <<"\t" \
+		<< 60 <<"\t" 
+		<<LeftR-LeftL-Pos<<"M"<<RightL-LeftR<<"N"<<StringLength-(LeftR-LeftL-Pos)<<"M\t"
+		<< "*\t0\t0\t" 
+		<< Seq << "\t" 
+		<< Qual <<endl;
 	return true;
 }
 
