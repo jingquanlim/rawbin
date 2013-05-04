@@ -60,10 +60,12 @@ unsigned CONVERSION_FACTOR;
 unsigned Conversion_Factor,SOURCELENGTH;
 map <unsigned, Ann_Info> Annotations;
 FILETYPE File_Info;
+pthread_mutex_t sam_lock,fa_lock;
 
 int READLEN,ORG_STRINGLENGTH;
 char Char_To_CodeC[256];
 char Char_To_Code[256];
+char Char_To_C[256];
 
 FILE *Input_File,*Mate_File;
 //---------------RQ stuff -------------------------
@@ -78,15 +80,18 @@ int RESIDUE=5;
 void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL);
 void Load_FM_Indexes(Index_Info Genome_Files,BWT* & fwfmi,BWT* & revfmi,MMPool* & mmPool);
 void InitX(BWT *revfmi,unsigned & SOURCELENGTH,FILE* & Input_File,FILE* & Mate_File,FILETYPE & File_Info,Parameters & CL,Index_Info & Genome_Files,int & MAX_MISMATCHES);
-void Convert_Reverse(char* Read,char * RC_Read,char* RC_Bin,int StringLength);
 bool  Progress_Bar(Parameters & CL,unsigned & Number_of_Tags,unsigned & Progress,unsigned & Tag_Count,FILETYPE & File_Info);
 void Launch_Threads(int NTHREAD, void* (*Map_t)(void*),Thread_Arg T);
 int Map_Read(MEMX & MF,MEMX & MC,int MAX_MISMATCHES, LEN & L,BWT* fwfmi,BWT* revfmi,int Next_Mis,int Max_Hits);
 void *Map(void *T);
 void Set_Affinity();
-void Process_Hits(MEMX & MF,MEMX & MC,int StringLength,ofstream & Out_File,ofstream & Mishit_File,READ & Head);
+bool Process_Hits(MEMX & MF,MEMX & MC,int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,ofstream & MISHIT_FILE,READ & Head);
+void Print_Mishit(READ & Head,ofstream & MISHIT_FILE);
 void Open_Outputs(ofstream & SAM,string filename);
-bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & Out_File,string Des);
+void Rev_Str(char* Dest,char* Q,int StringLength);
+void Convert_Reverse(char* Read,char * RC_Read,char* RC_Bin,int StringLength);
+void Convert_Reverse_Str(char* Read,char * RC_Read,int StringLength);
+bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* Des,char Read_Sign,READ & Head);
 
 int main(int argc, char* argv[])
 {
@@ -95,6 +100,10 @@ int main(int argc, char* argv[])
 	time(&Start_Time);
 
 	Build_Pow10();
+	if ((pthread_mutex_init(&fa_lock, NULL) != 0) ||(pthread_mutex_init(&sam_lock, NULL) != 0))
+	{
+		cout << "Threading error\n";exit(100);
+	}
 	Parse_Command_line(argc,argv,Genome_Files,CL);
 	Load_FM_Indexes(Genome_Files,fwfmi,revfmi,mmPool);
 	InitX(revfmi,SOURCELENGTH,Input_File,Mate_File,File_Info,CL,Genome_Files,MAX_MISMATCHES);
@@ -146,10 +155,11 @@ void *Map(void *T)
 	Init_Batman(MC,L,MLook,MAX_MISMATCHES);
 //--------------------- Setup Data Structure for Batman End----------------------------------------
 	
-	ofstream Mishit_File,Out_File;
-	string Mishit_File_Name = "rejected",Out_File_Name="trans";
-	Open_Outputs(Mishit_File, Mishit_File_Name+Str_Thread_ID+".fq");
-	Open_Outputs(Out_File, Out_File_Name+Str_Thread_ID+".sam");
+	ofstream MISHIT_FILE,OUT_FILE,SAM_FILE;
+	string Mishit_File_Name = "mishit",Out_File_Name="trans",Sam_File_Name="alignments";
+	Open_Outputs(SAM_FILE, Sam_File_Name+Str_Thread_ID+".sam");
+	Open_Outputs(MISHIT_FILE, Mishit_File_Name+Str_Thread_ID+".fq");
+	Open_Outputs(OUT_FILE, Out_File_Name+Str_Thread_ID+".sam");
 
 
 	fprintf(stderr,"======================]\r[");//progress bar....
@@ -171,26 +181,39 @@ void *Map(void *T)
 		int Mismatch_Scan=Map_Read(MF,MC,MAX_MISMATCHES,L,fwfmi,revfmi,0,2);
 		if(Mismatch_Scan>=0)
 		{
-			Process_Hits(MF,MC,File_Info.STRINGLENGTH,Out_File,Mishit_File,Head);
+			if(Process_Hits(MF,MC,File_Info.STRINGLENGTH,OUT_FILE,SAM_FILE,MISHIT_FILE,Head))
+				continue;
 		}
+		Print_Mishit(Head,MISHIT_FILE);
 	}
 }
 
-void Process_Hits(MEMX & MF,MEMX & MC,int StringLength,ofstream & Out_File,ofstream & Mishit_File,READ & Head)
+void Print_Mishit(READ & Head,ofstream & MISHIT_FILE)
+{
+	if(char *End=strchr(Head.Description,'\n'))
+		*End=0;
+	MISHIT_FILE << Head.Description << endl <<Head.Tag_Copy << "+\n"<<Head.Quality;
+}
+
+bool Process_Hits(MEMX & MF,MEMX & MC,int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,ofstream & MISHIT_FILE,READ & Head)
 {
 	int Plus_Hits=0,Minu_Hits=0;
 	if(MF.Hit_Array_Ptr+MC.Hit_Array_Ptr!=1) //Multiple hits..
-		return;
+		return false;
 	
 	Ann_Info A;
 	unsigned Loc;
 	SARange SA;
+	char Read_Sign;
+
 	if(MF.Hit_Array_Ptr)
 	{
-		SA=MF.Hit_Array[0];
+		SA=MF.Hit_Array[0];Read_Sign='+';
 	}
 	else
-		SA=MC.Hit_Array[0];
+	{
+		SA=MC.Hit_Array[0];Read_Sign='-';
+	}
 
 	if(SA.Start==SA.End)
 	{
@@ -199,19 +222,14 @@ void Process_Hits(MEMX & MF,MEMX & MC,int StringLength,ofstream & Out_File,ofstr
 	}
 	else//Multiple Hits..
 	{
-		return;
-		Loc=Conversion_Factor-BWTSaValue(revfmi,SA.Start);
+		return false;
 	}
 
 	Location_To_Genome(Loc,A);
 	if (Loc+StringLength > A.Size)//check for a Boundary Hit..
 	{
-		//string Des=A.Name;
-		//Out_File<<A.Name<<":"<<Loc<<endl;
-		*strchr(Head.Description,'\n')=0;
-		string Des=Head.Description;
 		char Name[300];strcpy(Name,A.Name);
-		Call_Junc(Name,Loc,StringLength,Out_File,Des);
+		return Call_Junc(Name,Loc,StringLength,OUT_FILE,SAM_FILE,Head.Description,Read_Sign,Head);
 	}
 
 }
@@ -428,6 +446,9 @@ void InitX(BWT *revfmi,unsigned & SOURCELENGTH,FILE* & Input_File,FILE* & Mate_F
 	Char_To_CodeC[0]=3;Char_To_CodeC[1]=2;Char_To_CodeC[2]=1;Char_To_CodeC[3]=0;
 	Char_To_CodeC['a']=3;Char_To_CodeC['c']=2;Char_To_CodeC['g']=1;Char_To_CodeC['t']=0;
 	Char_To_CodeC['-']='-';Char_To_CodeC['+']='+';//we are using character count to store the fmicode for acgt
+	Char_To_C['A']='T';Char_To_C['C']='G';Char_To_C['G']='C';Char_To_C['T']='A';
+	Char_To_C['a']='T';Char_To_C['c']='G';Char_To_C['g']='C';Char_To_C['t']='A';
+	Char_To_C['N']='C';Char_To_C['n']='c';
 
 	Open_Files(Input_File,Mate_File,CL);
 	Detect_Input(File_Info,Input_File,Mate_File);
@@ -626,22 +647,12 @@ void Open_Outputs(ofstream & SAM,string filename)
 
 //-----------------------------------------------------------------------------------------------------------------------------------
 
-bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & Out_File,string Des)
+bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* Des,char Read_Sign,READ & Head)
 {
 	//assert (L.c_str());// && DesS.c_str());
 	char Dummy[5000],Right[500],Left[500],Chr[20],Strand[3];//,Read[500],SignM;
 	unsigned RightL,LeftL,RightR,LeftR;
 
-	/*char *token = strtok (Junc, ",");
-	sscanf (token, "%s", Left);
-	token = strtok (NULL,",");
-	if(token)
-	{
-		    sscanf (token, "%s", Right);
-	}
-	else {Right[0]=0;}*/
-
-	//char *token;
 	char *token= strchr (Junc, ',');
 	if(!token) 
 		return 0;
@@ -675,19 +686,60 @@ bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & Out_File,stri
 				int Left_Cord=LeftR-3;int Right_Cord=RightL+3;
 				int Gap=Right_Cord-Left_Cord-3;
 				assert(Gap >0);
-				Out_File \
+
+				OUT_FILE \
 					<<Chr<<"\t"<<Left_Cord<<"\t"<<Right_Cord<<"\t" \
 					<<"JUNCXXX\t1000\t+\t" \
 					<<Left_Cord<<"\t"<<Right_Cord-1 \
 					<<"\t255,0,\t2\t3,3\t0," \
 					<<Gap<<endl;
-				/*cout \
-					<< Des <<"\t" \
-					<<Left<<"\t"<<Right<<"\t"<<Pos<<endl;*/
+
+				Head.Tag_Copy[StringLength]=Head.Quality[StringLength]=0;*(strchr(Des,'\n'))=0;
+				int Flag;char *Seq,*Qual,R_Seq[MAXTAG],R_Qual[MAXTAG];
+				if(Read_Sign=='+')
+				{
+					Flag=0;
+					Seq=Head.Tag_Copy;
+					Qual=Head.Quality;
+				}
+				else
+				{
+					Flag=16;
+					Convert_Reverse_Str(Head.Tag_Copy,R_Seq,StringLength);Seq=R_Seq;
+					Rev_Str(R_Qual,Head.Quality,StringLength);Qual=R_Qual;
+					R_Seq[StringLength]=R_Qual[StringLength]=0;
+				}
+				SAM_FILE \
+					<< Des+1 <<"\t" \
+					<< Flag <<"\t" \
+					<<Chr<<"\t"<<LeftL+Pos+1 <<"\t" \
+					<< 60 <<"\t" 
+					<<LeftR-LeftL-Pos<<"M"<<RightL-LeftR<<"N"<<StringLength-(LeftR-LeftL-Pos)<<"M\t"
+					<< "*\t0\t0\t" 
+					<< Seq << "\t" 
+					<< Qual <<endl;
 				return 1;
 			}
 			else return 0;
 		}
 	}
 	return true;
+}
+
+
+void Rev_Str(char* Dest,char* Q,int StringLength)
+{
+	for (int i=StringLength-1;i>=0;i--)
+	{
+		*Dest=Q[i];Dest++;
+	}
+	*Dest=0;
+}
+
+void Convert_Reverse_Str(char* Read,char * RC_Read,int StringLength)
+{
+	for (unsigned i=0;i<=StringLength-1;i++)
+	{
+		RC_Read[StringLength-1-i]=Char_To_C[Read[i]];
+	}
 }
