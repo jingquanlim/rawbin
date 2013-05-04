@@ -92,6 +92,8 @@ void Rev_Str(char* Dest,char* Q,int StringLength);
 void Convert_Reverse(char* Read,char * RC_Read,char* RC_Bin,int StringLength);
 void Convert_Reverse_Str(char* Read,char * RC_Read,int StringLength);
 bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* Des,char Read_Sign,READ & Head);
+bool Check_Duplicate(SARange & SA,int StringLength);
+bool Split_Boundry(char* Junc,char* Chr,unsigned & LeftL,unsigned & LeftR,unsigned & RightL,unsigned & RightR,char* Strand);
 
 int main(int argc, char* argv[])
 {
@@ -217,12 +219,18 @@ bool Process_Hits(MEMX & MF,MEMX & MC,int StringLength,ofstream & OUT_FILE,ofstr
 
 	if(SA.Start==SA.End)
 	{
+
 		Loc=SA.Start;
 
 	}
 	else//Multiple Hits..
 	{
-		return false;
+		/*if(Check_Duplicate(SA,StringLength))
+		{
+			Loc=SA.Start;
+		}
+		else*/
+			return false;
 	}
 
 	Location_To_Genome(Loc,A);
@@ -650,24 +658,22 @@ void Open_Outputs(ofstream & SAM,string filename)
 bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* Des,char Read_Sign,READ & Head)
 {
 	//assert (L.c_str());// && DesS.c_str());
-	char Dummy[5000],Right[500],Left[500],Chr[20],Strand[3];//,Read[500],SignM;
+	char Chr[20],Strand[3];//,Read[500],SignM;
 	unsigned RightL,LeftL,RightR,LeftR;
 
-	char *token= strchr (Junc, ',');
+	/*char *token= strchr (Junc, ',');
 	if(!token) 
 		return 0;
 	*token=0;
 	sscanf (Junc, "%s", Left);
-	sscanf (token+1, "%s", Right);
+	sscanf (token+1, "%s", Right);*/
 
-	if(!Right[0] || 'E'==Right[0]|| '<'==Right[0])
+	if(!Split_Boundry(Junc,Chr,LeftL,LeftR,RightL,RightR,Strand))
 	{
 		return 0;
 	}
 	else
 	{
-		sscanf(Left,"%[^:]%*c%u%*c%u%s",Chr,&LeftL,&LeftR,Strand);
-		sscanf(Right,"%*[^:]%*c%u%*c%u%s",&RightL,&RightR,Strand);
 		char Sign=Strand[1];
 		assert(LeftL>0 && LeftR >0 && RightL >0 && RightR>0 && (Sign=='+' || Sign=='-'));
 
@@ -741,5 +747,57 @@ void Convert_Reverse_Str(char* Read,char * RC_Read,int StringLength)
 	for (unsigned i=0;i<=StringLength-1;i++)
 	{
 		RC_Read[StringLength-1-i]=Char_To_C[Read[i]];
+	}
+}
+
+bool Check_Duplicate(SARange & SA,int StringLength)
+{
+	unsigned Loc,LocT;
+	Ann_Info T;
+	for(int i=SA.Start,j=0;i<=SA.End;i++,j++)
+	{
+		Ann_Info A;
+		Loc=Conversion_Factor-BWTSaValue(revfmi,i);
+		Location_To_Genome(Loc,A);
+		if (Loc+StringLength > A.Size)//check for a Boundary Hit..
+		{
+			if(j)
+			{
+				if(strcmp(A.Name,T.Name))
+				{
+					return false;
+				}
+			}	
+			T=A;
+			LocT=Loc;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	SA.Start=SA.End=LocT;
+	return true;
+}
+
+bool Split_Boundry(char* Junc,char* Chr,unsigned & LeftL,unsigned & LeftR,unsigned & RightL,unsigned & RightR,char* Strand)
+{
+	char Right[500],Left[500];//,Read[500],SignM;
+	char *token= strchr (Junc, ',');
+	if(!token) 
+		return false;
+	*token=0;
+	sscanf (Junc, "%s", Left);
+	sscanf (token+1, "%s", Right);
+
+	if(!Right[0] || 'E'==Right[0]|| '<'==Right[0])
+	{
+		return false;
+	}
+	else
+	{
+		sscanf(Left,"%[^:]%*c%u%*c%u%s",Chr,&LeftL,&LeftR,Strand);
+		sscanf(Right,"%*[^:]%*c%u%*c%u%s",&RightL,&RightR,Strand);
+		return true;
 	}
 }
