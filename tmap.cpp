@@ -225,19 +225,18 @@ bool Process_Hits(MEMX & MF,MEMX & MC,int StringLength,ofstream & OUT_FILE,ofstr
 	}
 	else//Multiple Hits..
 	{
-		/*if(Check_Duplicate(SA,StringLength))
+		if(Check_Duplicate(SA,StringLength))
 		{
 			Loc=SA.Start;
 		}
-		else*/
+		else
 			return false;
 	}
 
 	Location_To_Genome(Loc,A);
 	if (Loc+StringLength > A.Size)//check for a Boundary Hit..
 	{
-		char Name[300];strcpy(Name,A.Name);
-		return Call_Junc(Name,Loc,StringLength,OUT_FILE,SAM_FILE,Head.Description,Read_Sign,Head);
+		return Call_Junc(A.Name,Loc,StringLength,OUT_FILE,SAM_FILE,Head.Description,Read_Sign,Head);
 	}
 
 }
@@ -661,13 +660,6 @@ bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & OUT_FILE,ofst
 	char Chr[20],Strand[3];//,Read[500],SignM;
 	unsigned RightL,LeftL,RightR,LeftR;
 
-	/*char *token= strchr (Junc, ',');
-	if(!token) 
-		return 0;
-	*token=0;
-	sscanf (Junc, "%s", Left);
-	sscanf (token+1, "%s", Right);*/
-
 	if(!Split_Boundry(Junc,Chr,LeftL,LeftR,RightL,RightR,Strand))
 	{
 		return 0;
@@ -752,24 +744,32 @@ void Convert_Reverse_Str(char* Read,char * RC_Read,int StringLength)
 
 bool Check_Duplicate(SARange & SA,int StringLength)
 {
-	unsigned Loc,LocT;
-	Ann_Info T;
+	unsigned Loc,LocT,LeftRT,RightLT;
+	char ChrT[20],Chr[20],Strand[3];
 	for(int i=SA.Start,j=0;i<=SA.End;i++,j++)
 	{
 		Ann_Info A;
 		Loc=Conversion_Factor-BWTSaValue(revfmi,i);
+		LocT=Loc;
 		Location_To_Genome(Loc,A);
 		if (Loc+StringLength > A.Size)//check for a Boundary Hit..
 		{
+			unsigned RightL,LeftL,RightR,LeftR;
+			Split_Boundry(A.Name,Chr,LeftL,LeftR,RightL,RightR,Strand);
 			if(j)
 			{
-				if(strcmp(A.Name,T.Name))
+				if(LeftR==LeftRT && RightL==RightLT)
 				{
-					return false;
+					if(strcmp(ChrT,Chr))
+					{
+						return false;
+					}
 				}
+				else
+					return false;
 			}	
-			T=A;
-			LocT=Loc;
+			strcpy(ChrT,Chr);
+			LeftRT=LeftR;RightLT=RightL;
 		}
 		else
 		{
@@ -780,8 +780,9 @@ bool Check_Duplicate(SARange & SA,int StringLength)
 	return true;
 }
 
-bool Split_Boundry(char* Junc,char* Chr,unsigned & LeftL,unsigned & LeftR,unsigned & RightL,unsigned & RightR,char* Strand)
+bool Split_Boundry(char* Junc1,char* Chr,unsigned & LeftL,unsigned & LeftR,unsigned & RightL,unsigned & RightR,char* Strand)
 {
+	char Junc[300];strcpy(Junc,Junc1);
 	char Right[500],Left[500];//,Read[500],SignM;
 	char *token= strchr (Junc, ',');
 	if(!token) 
