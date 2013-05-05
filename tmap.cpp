@@ -91,7 +91,7 @@ void Open_Outputs(ofstream & SAM,string filename);
 void Rev_Str(char* Dest,char* Q,int StringLength);
 void Convert_Reverse(char* Read,char * RC_Read,char* RC_Bin,int StringLength);
 void Convert_Reverse_Str(char* Read,char * RC_Read,int StringLength);
-bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* Des,char Read_Sign,READ & Head);
+bool Call_Junc(int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* Des,char Read_Sign,READ & Head,unsigned Org_Loc);
 bool Check_Duplicate(SARange & SA,int StringLength);
 bool Split_Boundry(char* Junc,char* Chr,unsigned & LeftL,unsigned & LeftR,unsigned & RightL,unsigned & RightR,char* Strand);
 
@@ -233,11 +233,7 @@ bool Process_Hits(MEMX & MF,MEMX & MC,int StringLength,ofstream & OUT_FILE,ofstr
 			return false;
 	}
 
-	Location_To_Genome(Loc,A);
-	if (Loc+StringLength > A.Size)//check for a Boundary Hit..
-	{
-		return Call_Junc(A.Name,Loc,StringLength,OUT_FILE,SAM_FILE,Head.Description,Read_Sign,Head);
-	}
+	return Call_Junc(StringLength,OUT_FILE,SAM_FILE,Head.Description,Read_Sign,Head,Loc);
 
 }
 
@@ -658,50 +654,67 @@ struct Junc_Info
 {
 	unsigned Right_Cord;
 	unsigned Left_Cord;
+	int Skip;
 	int Gap;
 };
 const int MAX_JUNC=4;
 
-bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* Des,char Read_Sign,READ & Head)
+bool Call_Junc(int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* Des,char Read_Sign,READ & Head,unsigned Org_Loc)
 {
 	//assert (L.c_str());// && DesS.c_str());
 	char Chr[20],Strand[3];//,Read[500],SignM;
 	unsigned RightL,LeftL,RightR,LeftR;
 	Junc_Info J[MAX_JUNC];int J_Ptr=0;
 
+	int StringLengthT=StringLength,Exon_Length=0;
+	int Left_Gap,Right_Gap;
+	unsigned Pos=Org_Loc,Co_Ord;
+	Ann_Info A;
 
-	if(!Split_Boundry(Junc,Chr,LeftL,LeftR,RightL,RightR,Strand))
+	while(true)
 	{
-		return 0;
-	}
-	else
-	{
-		char Sign=Strand[1];
-		
-		assert(LeftL>0 && LeftR >0 && RightL >0 && RightR>0 && (Sign=='+' || Sign=='-'));
-
-		int Left_Gap=LeftR-(LeftL+Pos);
-		int Right_Gap=RightR-RightL;
-		assert(Left_Gap >0 && Right_Gap>0);
-		if(Left_Gap+Right_Gap<StringLength)
+		Location_To_Genome(Pos,A);
+		if (Pos+StringLength <= A.Size)//check for a Boundary Hit..
 		{
-			//cout<<"third\n";
+			break;	
 		}
-		if ((Left_Gap<RESIDUE) || (Left_Gap>StringLength-RESIDUE))
+
+		if(!Split_Boundry(A.Name,Chr,LeftL,LeftR,RightL,RightR,Strand))
 		{
-			return 0;
+			return 0;//Does not form a consistant transcript..
 		}
 		else
 		{
+			char Sign=Strand[1];
+
+			assert(LeftL>0 && LeftR >0 && RightL >0 && RightR>0 && (Sign=='+' || Sign=='-'));
+			if(!J_Ptr)
+				Co_Ord=LeftL+Pos+1;
+
+			Left_Gap=LeftR-(LeftL+Pos);
+			Right_Gap=RightR-RightL;
+			assert(Left_Gap >0 && Right_Gap>0);
+			Exon_Length=Left_Gap+Right_Gap;
+
 			J[J_Ptr].Left_Cord=LeftR-3;
 			J[J_Ptr].Right_Cord=RightL+3;
 			J[J_Ptr].Gap=J[J_Ptr].Right_Cord-J[J_Ptr].Left_Cord-3;
-			assert(J[J_Ptr].Gap >0);
+			J[J_Ptr].Skip=Left_Gap;
+			assert(J[J_Ptr].Gap >0 && J[J_Ptr].Skip>0);
 			if(++J_Ptr==MAX_JUNC)
 				return false;
-
+				
+			if(Left_Gap+Right_Gap>=StringLengthT)
+			{
+				break;
+			}
 		}
+		Org_Loc+=Left_Gap;
+		StringLengthT-=Left_Gap;
+		Pos=Org_Loc;
 	}
+	if(!Exon_Length)//no boundaries crossed..
+		return false;
 
 	for(int i=0;i<J_Ptr;i++)
 	{
@@ -730,11 +743,19 @@ bool Call_Junc(char* Junc,unsigned Pos,int StringLength,ofstream & OUT_FILE,ofst
 	}
 
 	SAM_FILE \
-		<< Des+1 <<"\t" \
-		<< Flag <<"\t" \
-		<<Chr<<"\t"<<LeftL+Pos+1 <<"\t" \
-		<< 60 <<"\t" 
-		<<LeftR-LeftL-Pos<<"M"<<RightL-LeftR<<"N"<<StringLength-(LeftR-LeftL-Pos)<<"M\t"
+		<< Des+1 <<"\t" 
+		<< Flag <<"\t" 
+		<<Chr<<"\t"<<Co_Ord<<"\t" 
+		<< 60 <<"\t"; 
+	int Tot_Skip=0;
+	for(int i=0;i<J_Ptr;i++)
+	{
+		SAM_FILE <<J[i].Skip<<"M"<<J[i].Gap-3<<"N";
+		Tot_Skip+=J[i].Skip;
+	}
+	SAM_FILE <<StringLength-Tot_Skip<<"M\t";
+
+	SAM_FILE \
 		<< "*\t0\t0\t" 
 		<< Seq << "\t" 
 		<< Qual <<endl;
