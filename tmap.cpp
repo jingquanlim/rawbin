@@ -252,30 +252,22 @@ option Long_Options[]=
 {
 {"help",0,NULL,'h'},
 {"query",1,NULL,'q'},
+{"residue",1,NULL,'r'},
 {0,0,0,0}
 };
 
 void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 {
 	int Current_Option=0;
-	char Short_Options[] ="jM:bhq:t:g:G:n:N:o:w:mprO::T:";//allowed options....
+	char Short_Options[] ="q:t:g:n:r:T:";//allowed options....
 	char* This_Program = argv[0];//Current program name....
 	char Help_String[]=
 "Parameters:\n"
 " --help | -h\t\t\t\t Print help\n"
-" --query | -m \t\t map only\n"
-" --query | -M \t\t Store <number> junctions..\n"
-" --query | -p \t\t process only\n"
 " --query | -q <filename>\t\t Query file(File of Tags)\n"
-" --query | -r \t\t mark exons in refGene..\n"
-" --query | -o <filename>\t\t junction file...\n"
-" --query | -w <filename>\t\t Wiggle file...\n"
-" --query | -O <filename>\t\t log read mapping info...\n"
-" --query | -G <number>\t\t maximum gap between two introns...\n"
-" --query | -n <number>\t\t number of mismatches in Initial Scan...\n"
-" --query | -N <number>\t\t number of mismatches in splices...\n"
-" --query | -b \t\t build files from refgene\n"
-" --query | -j \t\t output all junctions...\n"
+" --query | -r \t\t Min flanking region size..\n"
+" --query | -n <number>\t\t number of mismatches allowed...\n"
+" --query | -T \t\t Number of threads...\n"
 ;
 
 	if(argc == 1) {printf("%s \n",Help_String);exit(0);}
@@ -303,12 +295,12 @@ void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 				else CL.PATTERNFILE1=optarg;
 				CL.Patternfile_Count++;
 				break;
-			case 'G':
+			/*case 'G':
 				CL.EXONGAP=atoi(optarg);
 				break;
 			case 'o':
 				CL.JUNCTIONFILE=optarg;
-				break;
+				break;*/
 			case 'n':
 				MAX_MISMATCHES=atoi(optarg);
 				break;
@@ -340,6 +332,9 @@ void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 				WRITE_SPLITREAD=TRUE;
 				if (optarg) MAPFILE=optarg;
 				break;*/
+			case 'r':
+				RESIDUE=atoi(optarg);
+				break;
 			case 'g':
 				Name=optarg;Last_Dash=0;Genome_Name=optarg;
 				for(;Name[0]!=0;Name++)
