@@ -41,6 +41,16 @@ extern "C"
 #include "Indexes.h"
 #include "file.h"
 //#include "extend.h"
+
+struct Junc_Info
+{
+	unsigned Right_Cord;
+	unsigned Left_Cord;
+	int Skip;
+	int Gap;
+};
+const int MAX_JUNC=4;
+
 extern const int POWLIMIT=300;
 extern const int QUALITYCONVERSIONFACTOR=33;
 
@@ -94,6 +104,7 @@ void Convert_Reverse_Str(char* Read,char * RC_Read,int StringLength);
 bool Call_Junc(int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* Des,char Read_Sign,READ & Head,unsigned Org_Loc);
 bool Check_Duplicate(SARange & SA,int StringLength);
 bool Split_Boundry(char* Junc,char* Chr,unsigned & LeftL,unsigned & LeftR,unsigned & RightL,unsigned & RightR,char* Strand);
+void Trim_Short(Junc_Info *J,int & J_Ptr,int & Head_Trim,int & Skip_Len);
 
 int main(int argc, char* argv[])
 {
@@ -650,15 +661,6 @@ void Open_Outputs(ofstream & SAM,string filename)
 
 //-----------------------------------------------------------------------------------------------------------------------------------
 
-struct Junc_Info
-{
-	unsigned Right_Cord;
-	unsigned Left_Cord;
-	int Skip;
-	int Gap;
-};
-const int MAX_JUNC=4;
-
 bool Call_Junc(int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* Des,char Read_Sign,READ & Head,unsigned Org_Loc)
 {
 	//assert (L.c_str());// && DesS.c_str());
@@ -713,8 +715,17 @@ bool Call_Junc(int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* De
 		StringLengthT-=Left_Gap;
 		Pos=Org_Loc;
 	}
+
 	if(!Exon_Length)//no boundaries crossed..
 		return false;
+	int Head_Trim=0,Skip_Len;
+	Trim_Short(J,J_Ptr,Head_Trim,Skip_Len);
+	if(StringLength-Skip_Len<RESIDUE)//tail residue is too short..
+		J_Ptr--;
+	if(J_Ptr<1)
+	{
+		return false;//Skip is too small..	
+	}
 
 	for(int i=0;i<J_Ptr;i++)
 	{
@@ -745,15 +756,21 @@ bool Call_Junc(int StringLength,ofstream & OUT_FILE,ofstream & SAM_FILE,char* De
 	SAM_FILE \
 		<< Des+1 <<"\t" 
 		<< Flag <<"\t" 
-		<<Chr<<"\t"<<Co_Ord<<"\t" 
+		<<Chr<<"\t"<<Co_Ord+Head_Trim<<"\t" 
 		<< 60 <<"\t"; 
-	int Tot_Skip=0;
+	if(Head_Trim)
+	{
+		assert(J_Ptr>=1);
+		SAM_FILE << Head_Trim<<"S";
+	}
 	for(int i=0;i<J_Ptr;i++)
 	{
 		SAM_FILE <<J[i].Skip<<"M"<<J[i].Gap-3<<"N";
-		Tot_Skip+=J[i].Skip;
 	}
-	SAM_FILE <<StringLength-Tot_Skip<<"M\t";
+	if(StringLength-Skip_Len<RESIDUE)
+		SAM_FILE <<J[J_Ptr].Skip<<"M"<<StringLength-Skip_Len<<"S\t";
+	else
+		SAM_FILE <<StringLength-Skip_Len<<"M\t";
 
 	SAM_FILE \
 		<< "*\t0\t0\t" 
@@ -839,4 +856,39 @@ bool Split_Boundry(char* Junc1,char* Chr,unsigned & LeftL,unsigned & LeftR,unsig
 		sscanf(Right,"%*[^:]%*c%u%*c%u%s",&RightL,&RightR,Strand);
 		return true;
 	}
+}
+
+void Trim_Short(Junc_Info *J,int & J_Ptr,int & Head_Trim,int & Skip_Len)
+{
+	int Start=0;
+	Skip_Len=0;
+	bool In_Middle=false;
+	for(int i=0;i<J_Ptr;i++)
+	{
+		Skip_Len+=J[i].Skip;
+		if(J[i].Skip<RESIDUE && !In_Middle)
+		{
+			Head_Trim+=J[i].Skip;
+			Start++;continue;
+		}
+		In_Middle=true;
+	}
+	for(int i=Start,j=0;i<J_Ptr;i++,j++)
+	{
+		J[j]=J[i];
+	}
+	J_Ptr-=Start;
+
+	/*int End=0;
+	for(int i=J_Ptr-1;i>=0;i--)
+	{
+		if(J[i]<=RESIDUE)
+		{
+			Tail_Trim+=J[i].Skip;
+			End=i;continue;
+		}
+		else
+			break
+	}
+	J_Ptr=End;*/
 }
