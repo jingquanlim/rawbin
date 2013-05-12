@@ -41,6 +41,18 @@ int Canonical_Score(char* signal)
 	}
 	//return !(&& && 
 }
+char Canonical_Sign(char* signal)
+{
+	assert(strlen(signal)==4);
+	if(!strcmp(signal, "GTAG") || !strcmp(signal, "ATAC")||!strcmp(signal, "GCAG"))
+	{
+		return '+';
+	}	
+	else 
+	{
+		return '-';
+	}	
+}
 /*int main(int argc, char* argv[]){
 	loadPac("test.fasta.pac");
 	//printf("%s\n",Original_Text);

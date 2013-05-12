@@ -256,7 +256,7 @@ void *Map(void *T)
 
 //------------------- INIT -------------------------------------------------------------
 	ofstream SAM[5];
-	string SAMFiles[] = {"unique_signal","unique_nosignal",/*"mishits.fq",*/"nonunique_onesignal","others","mishits"};
+	string SAMFiles[] = {"alignments","unique_nosignal",/*"mishits.fq",*/"nonunique_onesignal","others","mishits"};
 	PAIR *Pairs;
 	//Junction Final_Juncs[2*MAX_JUNCS_TO_STORE+2];
 
@@ -361,7 +361,8 @@ void *Map(void *T)
 					Hit_ID++;
 					for(int i=0; i<approvedPtr; i++) 
 					{
-						Print_Hits(Head,TD.Compiled_Junctions,rejectedSAM,selectedJunctions[i],Hit_ID,Err,Genome_Offsets,true);//tempType);
+						//Print_Hits(Head,TD.Compiled_Junctions,rejectedSAM,selectedJunctions[i],Hit_ID,Err,Genome_Offsets,true);//tempType);
+						Print_Hits(Head,TD.Compiled_Junctions,SAM[0],selectedJunctions[i],Hit_ID,Err,Genome_Offsets,true);//tempType);
 					}
 				}	
 				else if(approvedPtr) 
@@ -369,7 +370,7 @@ void *Map(void *T)
 					//assert(approvedPtr);
 					for(int i=0; i<approvedPtr; i++) 
 					{
-						Print_Hits(Head,TD.Compiled_Junctions,SAM[tempType],selectedJunctions[i],0,Err,Genome_Offsets,false);//tempType);
+						Print_Hits(Head,TD.Compiled_Junctions,SAM[0],selectedJunctions[i],0,Err,Genome_Offsets,false);//tempType);
 					}
 				}
 			}

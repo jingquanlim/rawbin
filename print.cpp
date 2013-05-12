@@ -95,7 +95,8 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 			<< "*\t0\t0\t" 
 			<< R << "\t" 
 			<< Q << "\t"
-			<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" << "NH:f:" << Final_Juncs[i].score <<"\tER:i:"<<Err<<endl;
+			<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" << "NH:f:" << Final_Juncs[i].score 
+			<<"\tXS:A:"<<(char) Canonical_Sign(Final_Juncs[i].signal)<<"\tER:i:"<<Err<<endl;
 	}
 	else//Full read map..
 	{

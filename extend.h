@@ -17,5 +17,6 @@ inline void Convert_Reverse(char* Read_bin, char* RC_bin,int StringLength);
 float signalScore(char* signal);
 float getScore(unsigned p, unsigned q, unsigned x, int size, int i, int misL, int misR, char sign);
 Junction* extendX(char* R,char* basesL,char* basesR,unsigned p,unsigned q,char sign,unsigned x);
+char Canonical_Sign(char* signal);
 //Junction* extendX(char* R,char* basesL,char* basesR,unsigned p,unsigned q,char sign);
 #endif
