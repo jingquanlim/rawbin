@@ -164,7 +164,7 @@ bool  Progress_Bar(Parameters & CL,unsigned & Number_of_Tags,unsigned & Progress
 int Find_Pairings(int & Pairs_Index,SARange* MF_Pre_Hits,SARange* MF_Suf_Hits,PAIR* &  Pairs, char* Read,char* Read_Head,int STRINGLENGTH,int & Final_Juncs_Ptr,Junction *Final_Juncs,int & Min_Mismatch,int Mis_In_Head,int Mis_In_Tail,int Skip,int & Label,char Sign);
 void Open_Outputs(ofstream & SAM,string filename);
 inline char* Nullify_String(char* S);
-void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int Tag_Count, int firstSignal);
+//void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int Tag_Count, int firstSignal);
 int Classify_Hits(Junction * Final_Juncs, int & firstSignal);
 inline void Convert_Reverse(char* Read,char * RC_Read,char* RC_Bin,int StringLength);
 void Print_SAM_Header(std::map <unsigned, Ann_Info> Annotations,int argc,char* argv[],char* Input_File);
@@ -189,6 +189,7 @@ void Partial_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,MEM
 void Scan_Right_Read(char* Current_Tag,int StringLength,MEMX & Pre, MEMX & Suf,Transcript_Data & TD,char* Q);
 void Extension_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,MEMX & Pre,MEMX & Suf,char Sign,Transcript_Data & TD,int & Err,char* Q);
 void Seek_Residue(int & GT_Ptr,int *GT,char* Current_Tag_ASCII,int StringLength,char* RightX,char* Q,char *Signal,unsigned Loc,Transcript_Data & TD,char Sign);
+void Print_Matches(MEMX & MF,MEMX & MC,READ & Head,ofstream & SAM,int StringLength,Offset_Record *Genome_Offsets);
 //}-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 
 int main(int argc, char* argv[])
@@ -320,8 +321,12 @@ void *Map(void *T)
 		Convert_Reverse(Head.Tag,Rev,Rev_Bin,File_Info.STRINGLENGTH);
 		MF.Hits=0;MF.Hit_Array_Ptr=0;MF.Current_Tag=Head.Tag;MF_Pre.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
 		MC.Hits=0;MC.Hit_Array_Ptr=0;MC.Current_Tag=Rev_Bin;MC.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
-		int Mismatch_Scan=Scan_Both(MF,MC,INIT_MIS_SCAN,L_Long,fwfmi,revfmi,0,2);
-		if(Mismatch_Hit_Nice(Mismatch_Scan,MF,MC,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q,File_Info.STRINGLENGTH)) continue;
+		int Mismatch_Scan=Scan_Both(MF,MC,INIT_MIS_SCAN,L_Long,fwfmi,revfmi,0,20);
+		if(Mismatch_Hit_Nice(Mismatch_Scan,MF,MC,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q,File_Info.STRINGLENGTH)) 
+		{
+			Print_Matches(MF,MC,Head,SAM[0],File_Info.STRINGLENGTH,Genome_Offsets);
+			continue;
+		}
 
 		int Err=Seek_All_Junc(Head.Tag,File_Info.STRINGLENGTH,MF_Pre,MF_Suf,TD,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q);
 		TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
@@ -356,14 +361,15 @@ void *Map(void *T)
 					Hit_ID++;
 					for(int i=0; i<approvedPtr; i++) 
 					{
-						Print_Hits(Head,TD.Compiled_Junctions,OUT,rejectedSAM,Tag_Count,selectedJunctions[i],tempType,Hit_ID,Err,Genome_Offsets);//tempType);
+						Print_Hits(Head,TD.Compiled_Junctions,rejectedSAM,selectedJunctions[i],Hit_ID,Err,Genome_Offsets,true);//tempType);
 					}
 				}	
 				else if(approvedPtr) 
 				{
 					//assert(approvedPtr);
-					for(int i=0; i<approvedPtr; i++) {
-						Print_Hits(Head,TD.Compiled_Junctions,OUT,SAM[tempType],Tag_Count,selectedJunctions[i],tempType,0,Err,Genome_Offsets);//tempType);
+					for(int i=0; i<approvedPtr; i++) 
+					{
+						Print_Hits(Head,TD.Compiled_Junctions,SAM[tempType],selectedJunctions[i],0,Err,Genome_Offsets,false);//tempType);
 					}
 				}
 			}
@@ -377,7 +383,7 @@ void *Map(void *T)
 			if(Type)
 			{
 				selectedJunctions[0]=0;TD.Partial_Junctions[0].Type=Type;
-				Print_Hits(Head,TD.Partial_Junctions,OUT,SAM[0],Tag_Count,selectedJunctions[0],0,0,Err,Genome_Offsets);//tempType);
+				Print_Hits(Head,TD.Partial_Junctions,SAM[0],selectedJunctions[0],0,Err,Genome_Offsets,false);//tempType);
 			}
 			Head.Quality[File_Info.STRINGLENGTH]=0;
 			SAM[4] <<Head.Description<<endl<<Head.Tag_Copy<<endl<<"+"<<Head.Quality<<endl;
@@ -1363,7 +1369,6 @@ bool Exons_Too_Small(int Trans_Array_Ptr,Transcript_Data & TD)
 		return false;
 }
 
-
 void Launch_Threads(int NTHREAD, void* (*Map_t)(void*),Thread_Arg T)
 {
 	Threading* Thread_Info=(Threading*) malloc(sizeof(Threading)*NTHREAD);
@@ -1748,4 +1753,55 @@ void Seek_Residue(int & GT_Ptr,int *GT,char* Current_Tag_ASCII,int StringLength,
 			}
 		}
 	}
+}
+
+
+void Print_Matches(MEMX & MF,MEMX & MC,READ & Head,ofstream & SAM,int StringLength,Offset_Record *Genome_Offsets)
+{
+	unsigned Loc,Conversion_Factor=revfmi->textLength-StringLength+1;
+	if(MF.Hit_Array_Ptr) MF.Hit_Array_Ptr--;if(MC.Hit_Array_Ptr) MC.Hit_Array_Ptr--;
+	bool Multi_Hits=MF.Hit_Array_Ptr+MC.Hit_Array_Ptr;
+	Junction J;
+	for(int i=0;i<MF.Hit_Array_Ptr;i++)
+	{
+		SARange SA=MF.Hit_Array[i];assert(SA.Start);
+		if(SA.Start!=SA.End)
+		{
+			for(unsigned j=SA.Start;j<=SA.End;j++)
+			{
+				Loc=Conversion_Factor-BWTSaValue(revfmi,j);
+				assert(Loc);
+				J.p=Loc;J.r=0;J.q=0;J.Sign=1;
+				Print_Hits(Head,&J,SAM,0,0,0,Genome_Offsets,Multi_Hits);
+			}
+		}
+		else
+		{
+			Loc=SA.Start+RQFACTOR-StringLength+1;
+			assert(Loc);
+			J.p=Loc;J.q=J.r=0;J.Sign=1;
+			Print_Hits(Head,&J,SAM,0,0,0,Genome_Offsets,Multi_Hits);
+		}
+	}	
+	for(int i=0;i<MC.Hit_Array_Ptr;i++)
+	{
+		SARange SA=MC.Hit_Array[i];assert(SA.Start);
+		if(SA.Start!=SA.End)
+		{
+			for(unsigned j=SA.Start;j<=SA.End;j++)
+			{
+				Loc=Conversion_Factor-BWTSaValue(revfmi,j);
+				assert(Loc);
+				J.p=Loc;J.r=0;J.q=0;J.Sign=0;
+				Print_Hits(Head,&J,SAM,0,0,0,Genome_Offsets,Multi_Hits);
+			}
+		}
+		else
+		{
+			Loc=SA.Start+RQFACTOR-StringLength+1;
+			assert(Loc);
+			J.p=Loc;J.q=J.r=0;J.Sign=0;
+			Print_Hits(Head,&J,SAM,0,0,0,Genome_Offsets,Multi_Hits);
+		}
+	}	
 }

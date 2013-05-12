@@ -1,10 +1,22 @@
 #include "Print.h"
 extern int READLEN;
+extern char Char_To_CodeC[];
 extern const int UNIQUE_SIGNAL;//there is one junction, it has a signal
 extern const int UNIQUE_NOSIGNAL;//There is one junction, it does not have a signal..
 extern const int NON_UNIQUE_SIGNAL;//There are many local junctions, but only one have a signal..
 //extern Offset_Record Genome_Offsets[];
 char const* Junc_Decode[]={"CAN","SEMI","SEMI","NON"};
+
+void Reverse_Read(char* RDest,char* QDest,char* R,char* Q,int StringLength)
+{
+	for (int i=StringLength-1;i>=0;i--)
+	{
+		*RDest="ACGT"[Char_To_CodeC[R[i]]];RDest++;
+		*QDest=Q[i];QDest++;
+	}
+	*QDest=0;
+	*RDest=0;
+}
 
 char const* Get_Junc_Type(int Type)
 {
@@ -34,11 +46,11 @@ inline char* Nullify_String(char* S)
 	return Strend;
 }
 
-void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int Tag_Count, int firstSignal,int Junc_Type,unsigned Hit_ID,int Err,Offset_Record *Genome_Offsets)
+void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal,unsigned Hit_ID,int Err,Offset_Record *Genome_Offsets,bool Multi_Hits)
 {
-	//fprintf(OUT,"%s",Head.Description);  
 	Nullify_String(Head.Description+1);
 	Nullify_String(Head.Tag_Copy);
+	Nullify_String(Head.Quality);
 	assert(Hit_ID!=INT_MAX);//Hope there arent gazillion reads..
 	char CIGAR[500];
 	
@@ -57,8 +69,6 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 
 			Pair.x=Final_Juncs[i+j].p;
 			Pair.y=Final_Juncs[i+j].q;
-			//Final_Juncs[i].L=Final_Juncs[i].r;
-			//Final_Juncs[i].R=READLEN-Final_Juncs[i].r;
 			if(Final_Juncs[i+j].ID==INT_MAX-1) Final_Juncs[i].ID=A.ID;//Junction at extreme..
 			assert(Genome_Offsets[Final_Juncs[i+j].ID].Offset !=INT_MAX && Final_Juncs[i+j].ID==Final_Juncs[i].ID );
 			if(!Err) Genome_Offsets[Final_Juncs[i].ID].Junc_Hash->Insert(Pair,Final_Juncs[i+j],Hit_ID? false:true);
@@ -69,35 +79,46 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,FILE* OUT,ofstream & SAM,int T
 		}
 		sprintf(CIGAR_ptr,"%dM",READLEN-Last);
 
+		char *R=Head.Tag_Copy,*Q=Head.Quality;char RQ[MAXTAG],RR[MAXTAG];
+		if(!Final_Juncs[i].Sign)
+		{
+			Reverse_Read(RR,RQ,Head.Tag_Copy,Head.Quality,READLEN);
+			Q=Head.Quality;R=Head.Tag_Copy;
+		}
+
 		SAM << Head.Description+1 <<"\t"
 			<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  /*Flag*/
-			//<< Final_Juncs[i].Chrom <<"\t" 
 			<< A.Name <<"\t" 
 			<< Final_Juncs[i].p-Final_Juncs[i].r+1 << "\t" 
-			<< 60 <<"\t" 
+			<< (int)((Multi_Hits)? 0:60) <<"\t" 
 			<<CIGAR<<"\t"
-			//<< Final_Juncs[i].r << "M" << Final_Juncs[i].q-Final_Juncs[i].p+1<< "N" << READLEN-Final_Juncs[i].r <<"M\t" 
 			<< "*\t0\t0\t" 
-			<< Head.Tag_Copy << "\t" 
-			<< "*\t"
+			<< R << "\t" 
+			<< Q << "\t"
 			<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" << "NH:f:" << Final_Juncs[i].score <<"\tER:i:"<<Err<<endl;
 	}
-	else
+	else//Full read map..
 	{
 		assert(Final_Juncs[i].r==0);
 		Ann_Info A;
 		Location_To_Genome(Final_Juncs[i].p,A);
+		char *R=Head.Tag_Copy,*Q=Head.Quality;char RQ[MAXTAG],RR[MAXTAG];
+		if(!Final_Juncs[i].Sign)
+		{
+			Reverse_Read(RR,RQ,Head.Tag_Copy,Head.Quality,READLEN);
+			Q=RQ;R=RR;
+		}
 
 		SAM << Head.Description+1 <<"\t"
 			<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  /*Flag*/
 			<< A.Name <<"\t" 
 			<< Final_Juncs[i].p << "\t" 
-			<< 60 <<"\t" 
+			<< (int)((Multi_Hits)? 0:60) <<"\t" 
 			<< READLEN << "M\t"  
 			<< "*\t0\t0\t" 
-			<< Head.Tag_Copy << "\t" 
-			<< "*\t"
-			<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" <<"NH:f:" << Final_Juncs[i].score <<"\tER:i:"<<Err<<endl;
+			<< R << "\t" 
+			<< Q << "\t"
+			<< "NH:i:" << Final_Juncs[i].Mismatches <<"\t" <<"XS:A:." <<"\tER:i:"<<Err<<endl;
 	}
 }
 
