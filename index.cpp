@@ -28,9 +28,7 @@ extern "C"
 //{-----------------------------  DEFINES  -------------------------------------------------/
 //#define BUILTIN_LOG
 #define DEBUG
-#define SAGAP_CUTOFF 2
 #define FIELD_LENGTH 32
-#define MAXGAP 30000 //maximum SA range to sort...
 #define DEFAULT 0
 #define DEEP 1
 #define INTEGERSIZE 8 //integer size
@@ -101,6 +99,7 @@ void Load_Indexes();
 void Open_Files();
 void Build_Indices();
 void Print_Indices();
+void Build_Fake_Index();
 void Build_Preindex_Forward(Range Range, int Level, int Bit);
 void Build_Preindex_Backward(Range Range, int Level, int Bit);
 void Parse_Command_line(int argc, char* argv[]);
@@ -119,6 +118,10 @@ FILE* SaRanges;
 FILE* Ranges;
 FILE* Index;
 FILE* Blocks;
+FILE* Info;
+FILE* Log_SFile;
+
+char* LOG_SUCCESS_FILE=NULL;
 
 MMPool *mmPool;
 BWT *fwfmi,*revfmi;
@@ -126,12 +129,14 @@ off64_t File_Size;
 time_t Start_Time,End_Time;
 
 SA* SA_Array;
-Range_Record Range_Array[MAXGAP];
-unsigned Sorted_SA_Array[MAXGAP];
+Range_Record *Range_Array;//[30000];
+unsigned *Sorted_SA_Array;//[30000];
 
+int SAGAP_CUTOFF=2;
 int Actual_Tag;
 int LOOKUPSIZE=6;
 int HITMODE = DEFAULT;
+int MAXGAP=30000; //maximum SA range to sort...
 
 unsigned Hits,Total_Hits=0;
 unsigned Forward_Start_Lookup[4],Forward_End_Lookup[4],Backward_Start_Lookup[4],Backward_End_Lookup[4];
@@ -164,7 +169,9 @@ char* BLKFILE;
 char* INDFILE;
 char* RANGEFILE;
 char* SORTEDRANGEFILE;
+char* INFOFILE;
  
+unsigned Fake[3]={1,2,3};
 //}---------------------------- GLOBAL VARIABLES -------------------------------------------------
 
 //{---------------------------- Command Line  -------------------------------------------------
@@ -189,6 +196,8 @@ int main(int argc, char* argv[])
 	Parse_Command_line(argc,argv);	
 	Load_Indexes();	
 	printf("Unique hit length %d ..\n",LOOKUPSIZE);
+	Range_Array=(Range_Record*)malloc(sizeof(Range_Record)*MAXGAP);
+	Sorted_SA_Array=(unsigned*)malloc(sizeof(unsigned)*MAXGAP);
 	//Hits=0;Total_Hits=0;
 	//printf("===============================================================]\r[");	
 	//fflush(stdout);
@@ -199,24 +208,29 @@ int main(int argc, char* argv[])
 	Index=File_Open(INDFILE,"wb");
 	//Blocks=File_Open("blocksF.dat","wb");
 	Blocks=File_Open(BLKFILE,"wb");
+	Info=File_Open(INFOFILE,"w");
+	fprintf(Info,"SAGAP_CUTOFF\t%d\n",SAGAP_CUTOFF);
+	fprintf(Info,"MAXGAP\t%d\n",MAXGAP);
+
 	if(!SKIP_SA_ENUM)
 	{
 		SaRanges=File_Open(RANGEFILE,"wb");
-		printf("===============================================================]\r[");	
+		fprintf(stderr,"===============================================================]\r[");	
 		// Enumerate SA Ranges..
 		Build_Tables();
 		fwriteX(&Hits,1,sizeof(Hits),SaRanges);
 		fclose(SaRanges);
-		printf("\r[+++++++++++++++++++++++++++ 100%% ++++++++++++++++++++++++++++++]\n");	
-		time(&End_Time);printf("\n Time Taken  - %.0lf Seconds ..\n ",difftime(End_Time,Start_Time));
+		fprintf(stderr,"\r[+++++++++++++++++++++++++++ 100%% ++++++++++++++++++++++++++++++]\n");	
+		time(&End_Time);fprintf(stderr,"\n Time Taken  - %.0lf Seconds ..\n ",difftime(End_Time,Start_Time));
 	}
 
 //Build the final indices...
 	time(&Start_Time);
-	Build_Indices();
+	if (!Hits) Build_Fake_Index(); 
+	else Build_Indices();
 	//Print_Indices();
-	printf("\r[++++++++100%%+++++++++]\n");//progress bar....
-	time(&End_Time);printf("\n Time Taken  - %.0lf Seconds ..\n ",difftime(End_Time,Start_Time));
+	fprintf(stderr,"\r[++++++++100%%+++++++++]\n");//progress bar....
+	time(&End_Time);fprintf(stderr,"\n Time Taken  - %.0lf Seconds ..\n ",difftime(End_Time,Start_Time));
 	
 	
 }
@@ -314,9 +328,9 @@ void Build_Indices()
 	unsigned Progress;
 	unsigned Percent_Mark=Hits/20;
 	int Gap;
-	if (COMPRESS) printf("Building Compressed index...\n"); else printf ("Building uncompressed index...\n");
-	printf("%d SA Ranges indexed ...\n",Hits);
-	printf("======================]\r[");//progress bar....
+	if (COMPRESS) fprintf(stderr,"Building Compressed index...\n"); else fprintf (stderr,"Building uncompressed index...\n");
+	fprintf(stderr,"%d SA Ranges indexed ...\n",Hits);
+	fprintf(stderr,"======================]\r[");//progress bar....
 
 	for (unsigned i=0;i<Hits;i++)
 	{
@@ -332,10 +346,12 @@ void Build_Indices()
 	unsigned Conversion_Factor=revfmi->textLength-LOOKUPSIZE;
 
 	unsigned char* Block_Structure=(unsigned char*)malloc(Block_File_Size);//66550747); 
-	if (NULL==Block_Structure) {printf("malloc error:\n");exit(1);}
+	if (NULL==Block_Structure) {fprintf(stderr,"malloc error:\n");exit(1);}
 	unsigned Block_Index;
 	if(COMPRESS) Block_Index=1; else Block_Index=0;
 	int Field_Length=32;
+	bool Written=false;
+
 	for (unsigned i=0;i<Hits;i++)
 	{
 		Progress++;
@@ -351,7 +367,7 @@ void Build_Indices()
 			qsort(&Range_Array[0], Gap, sizeof(Range_Record), Range_Record_cmp);
 			SA_Array[i].End=Block_Index;
 			SA_Array[i].Start_Location=Range_Array[0].Location;
-			Field_Length=log2(Gap); if (Field_Length==32) printf("Error");
+			Field_Length=log2(Gap); if (Field_Length==32) fprintf(stderr,"Error");
 			int k=0;
 			for (int j=1;j<Gap-1;j++) 
 			{
@@ -366,7 +382,7 @@ void Build_Indices()
 					Block_Index++;k++;
 				}
 			}
-			if (!COMPRESS) fwriteX(Sorted_SA_Array,k,sizeof(unsigned),Blocks);
+			if (!COMPRESS) {fwriteX(Sorted_SA_Array,k,sizeof(unsigned),Blocks); Written=true;}
 
 			SA_Array[i].End_Location=Range_Array[Gap-1].Location;
 		}
@@ -374,8 +390,21 @@ void Build_Indices()
 
 	//printf("\r[++++++++100%%+++++++++]\n");//progress bar....
 	////fwriteX(&Hits,1,sizeof(unsigned),Index);
+	if(!Written) fwriteX(Fake,3,sizeof(unsigned),Blocks);
 	fwriteX(&SA_Array[0],Hits,sizeof(SA),Index);//write Ranges structure...
 	if(COMPRESS) fwriteX(Block_Structure,1,Block_File_Size,Blocks);
+}
+
+void Build_Fake_Index()
+{
+	SA_Array=(SA*)malloc(sizeof(SA));
+	SA_Array[0].Start=0;SA_Array[0].End=3;
+	Hits=1;
+	fwriteX(&SA_Array[0],Hits,sizeof(SA),Ranges);//write Ranges structure...
+	fwriteX(&COMPRESS,1,1,Blocks);//write header...
+	fwriteX(&Hits,1,sizeof(Hits),Blocks);//write header...
+	fwriteX(Fake,3,sizeof(unsigned),Blocks);
+	fwriteX(&SA_Array[0],Hits,sizeof(SA),Index);//write Ranges structure...
 }
 
 /*void Print_Indices()
@@ -524,7 +553,7 @@ void Build_Preindex_Backward(Range Range, int Level, int Bit)
 		//Backward_End_LookupX[Range.Label] = fwfmi->cumulativeFreq[Bit] + BWTOccValue(fwfmi, Range.End+1, Bit);
 		unsigned S=fwfmi->cumulativeFreq[Bit] + BWTOccValue(fwfmi, Range.Start , Bit) + 1;
 		unsigned L=fwfmi->cumulativeFreq[Bit] + BWTOccValue(fwfmi, Range.End+1, Bit);
-		if(L>=S) 
+		if(L>S)//(L>=S)  
 		{
 			Total_Hits++;
 			if(L-S<=SAGAP_CUTOFF)
@@ -546,7 +575,7 @@ void Build_Preindex_Backward(Range Range, int Level, int Bit)
 		Range.Label=Range.Label | (Bit<<2*(Level-1));//Calculate label 
 		Range.Start = fwfmi->cumulativeFreq[Bit] + BWTOccValue(fwfmi, Range.Start , Bit) + 1;
 		Range.End = fwfmi->cumulativeFreq[Bit] + BWTOccValue(fwfmi, Range.End+1, Bit);
-		if (Range.End >= Range.Start)
+		if (Range.End > Range.Start)//(Range.End >= Range.Start)
 		{
 			Level ++;
 			for ( int i=0;i<4;i++)
@@ -566,11 +595,7 @@ void Build_Preindex_Forward(Range Range, int Level, int Bit)
 		Range.Label=Range.Label | (Bit<<2*(Level-1));//Calculate label
 		unsigned S= revfmi->cumulativeFreq[Bit] + BWTOccValue(revfmi, Range.Start , Bit) + 1;
 		unsigned L= revfmi->cumulativeFreq[Bit] + BWTOccValue(revfmi, Range.End+1, Bit);
-if (S == 526804552) 
-{
-debug =1;
-}
-		if(L>=S) 
+		if(L>S)//if(L>=S) We keep only non-unique hits.. 
 		{
 			Total_Hits++;
 			if(L-S<=SAGAP_CUTOFF)
@@ -592,11 +617,7 @@ debug =1;
 		Range.Label=Range.Label | (Bit<<2*(Level-1));//Calculate label 
 		Range.Start = revfmi->cumulativeFreq[Bit] + BWTOccValue(revfmi, Range.Start , Bit) + 1;
 		Range.End = revfmi->cumulativeFreq[Bit] + BWTOccValue(revfmi, Range.End+1, Bit);
-if (Range.Start == 526804552) 
-{
-debug =1;
-}
-		if (Range.End >= Range.Start)
+		if (Range.End > Range.Start)//(Range.End >= Range.Start) only non unique needed...
 		{
 			Level ++;
 			for ( int i=0;i<4;i++)
@@ -625,7 +646,7 @@ FILE* File_Open(const char* File_Name,const char* Mode)
 	Handle=fopen64(File_Name,Mode);
 	if (Handle==NULL)
 	{
-		printf("File %s Cannot be opened ....",File_Name);
+		fprintf(stderr,"File %s Cannot be opened ....",File_Name);
 		exit(1);
 	}
 	else return Handle;
@@ -659,7 +680,7 @@ BWT* initFMI(const char* BWTCodeFileName,const char* BWTOccValueFileName, const 
 void Parse_Command_line(int argc, char* argv[])
 {
 	int Current_Option=0;
-	char* Short_Options ="ho:b:g:l:ec";//allowed options....
+	char* Short_Options ="ho:b:g:G:l:ecC:";//allowed options....
 	char* This_Program = argv[0];//Current program name....
 	char* Help_String=
 "Parameters:\n"
@@ -670,11 +691,12 @@ void Parse_Command_line(int argc, char* argv[])
 " --buffersize | -b <integer> \t\t Size of disk buffers\n"
 " --skipenum | -e \t\t\t Skip enumeration of SA ranges..\n"
 " --compress | -c \t\t\t Compress index..\n"
+" --sagapcutoff | -C \t\t\t Compress index..\n"
 ;
 
-	Source=(char*)malloc(sizeof(char)*6000);//create space for file names...
+	Source=(char*)malloc(sizeof(char)*6500);//create space for file names...
 	char *options, *value; 
-	char* Name;int Last_Dash;char* Genome_Name;
+	char* Name;int Last_Dash;char *Ind,*Blk;char* Genome_Name;
 
 	OUTFILE=OUTFILE_DEFAULT;GENOMEFILE=GENOMEFILE_DEFAULT;
 	BWTFILE = BWTFILE_DEFAULT; 
@@ -690,6 +712,14 @@ void Parse_Command_line(int argc, char* argv[])
 		{
 			case 'h':
 				printf("%s \n",Help_String);exit(0);
+			case 'G':
+				MAXGAP=atoi(optarg);
+				printf("Max Gap: %d\n",MAXGAP);
+				break;
+			case 'C':
+				SAGAP_CUTOFF=atoi(optarg);
+				printf("SAGAP_CUTOFF : %d\n",SAGAP_CUTOFF);
+				break;
 			case 'l':
 				LOOKUPSIZE=atoi(optarg);
 				break;
@@ -754,12 +784,14 @@ void Parse_Command_line(int argc, char* argv[])
 				BLKFILE = REVSAFILE+500;
 				strncpy(BLKFILE,optarg,Last_Dash);
 				strcpy(BLKFILE+Last_Dash,Genome_Name+1);
-				strcat(BLKFILE+Last_Dash,".blk"); 
+				strcat(BLKFILE+Last_Dash,".blk."); 
+				Blk=BLKFILE+strlen(BLKFILE);
 
 				INDFILE = BLKFILE+500;
 				strncpy(INDFILE,optarg,Last_Dash);
 				strcpy(INDFILE+Last_Dash,Genome_Name+1);
-				strcat(INDFILE+Last_Dash,".ind"); 
+				strcat(INDFILE+Last_Dash,".ind."); 
+				Ind=INDFILE+strlen(INDFILE);
 
 				RANGEFILE = INDFILE+500;
 				strncpy(RANGEFILE,optarg,Last_Dash);
@@ -771,12 +803,26 @@ void Parse_Command_line(int argc, char* argv[])
 				strcpy(SORTEDRANGEFILE+Last_Dash,Genome_Name+1);
 				strcat(SORTEDRANGEFILE+Last_Dash,".sort"); 
 
+				INFOFILE = SORTEDRANGEFILE+500;
+				strncpy(INFOFILE,optarg,Last_Dash);
+				strcpy(INFOFILE+Last_Dash,Genome_Name+1);
+				strcat(INFOFILE+Last_Dash,".info"); 
+
 				break;
 			default:
-				printf("%s \n",Help_String);
+				fprintf(stderr,"%s \n",Help_String);
 				exit(0);
 		}
 	}	
+	if (LOOKUPSIZE>0)
+	{
+		sprintf(Ind,"%d",LOOKUPSIZE);
+		sprintf(Blk,"%d",LOOKUPSIZE);
+	}
+	else
+	{
+		fprintf(stderr,"Parse_Command_line():Bad String Length\n");
+	}
 }
 
 //}-----------------------------  Parse Command Line  -------------------------------------------------
@@ -810,7 +856,7 @@ void Load_Indexes()
 	unsigned SOURCELENGTH = fwfmi->textLength;
 	if (SOURCELENGTH!=revfmi->textLength)
 	{ 
-		printf("FM index load error \n"); 
+		fprintf(stderr,"FM index load error \n"); 
 		exit(1);
 	}
 	//FWDInverseSA0=fwfmi->inverseSa0;
@@ -819,12 +865,12 @@ void Load_Indexes()
 void Show_Progress(float Percentage)
 {
 	if (Percentage >98) return;
-	printf("+%.0f%\b\b\b",Percentage);
+	fprintf(stderr,"+%.0f%\b\b\b",Percentage);
 	fflush(stdout);
 }
 
 
 void fwriteX(void* Offset,unsigned long Size1,unsigned long Size2,FILE* Handle)
 {
-		if(Size2 !=fwrite(Offset,Size1,Size2,Handle)) {printf("Error writing to file...\n");exit(1);};
+		if(Size2 !=fwrite(Offset,Size1,Size2,Handle)) {fprintf(stderr,"Error writing to file...\n");exit(1);};
 }

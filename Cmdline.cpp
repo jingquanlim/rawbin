@@ -7,10 +7,13 @@
 #define FALSE 0
 extern int THREAD;
 extern int INIT_MIS_SCAN;
+extern int RQFACTOR;
+extern int MINX;
 option Long_Options[]=
 {
 {"help",0,NULL,'h'},
 {"query",1,NULL,'q'},
+{"residue",1,NULL,'R'},
 {0,0,0,0}
 };
 
@@ -18,7 +21,7 @@ option Long_Options[]=
 void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 {
 	int Current_Option=0;
-	char Short_Options[] ="jM:bhq:t:g:G:n:N:o:w:mprO::T:";//allowed options....
+	char Short_Options[] ="R:jM:bhq:t:g:G:n:N:o:w:mprO::T:";//allowed options....
 	char* This_Program = argv[0];//Current program name....
 	char Help_String[]=
 "Parameters:\n"
@@ -28,6 +31,7 @@ void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 " --query | -p \t\t process only\n"
 " --query | -q <filename>\t\t Query file(File of Tags)\n"
 " --query | -r \t\t mark exons in refGene..\n"
+" --query | -R \t\t size of residue..\n"
 " --query | -o <filename>\t\t junction file...\n"
 " --query | -w <filename>\t\t Wiggle file...\n"
 " --query | -O <filename>\t\t log read mapping info...\n"
@@ -71,6 +75,10 @@ void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 				break;
 			case 'n':
 				INIT_MIS_SCAN=atoi(optarg);
+				break;
+			case 'R':
+				RQFACTOR=atoi(optarg);
+				MINX=RQFACTOR;
 				break;
 			/*case 'j':
 				DUMP_ALL_JUNC=TRUE;

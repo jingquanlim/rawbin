@@ -73,6 +73,7 @@ FILETYPE File_Info;
 pthread_mutex_t sam_lock,fa_lock;
 
 int READLEN,ORG_STRINGLENGTH;
+int RQFACTOR=18;
 char Char_To_CodeC[256];
 char Char_To_Code[256];
 char Char_To_C[256];

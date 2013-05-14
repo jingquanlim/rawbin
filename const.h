@@ -9,5 +9,5 @@ const char FA=1;
 const char FQ=2;
 const int MAXDES=500;
 const int MAXTAG=500;
-const int RQFACTOR=18;
+//const int RQFACTOR=18;
 #endif

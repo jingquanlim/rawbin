@@ -2,6 +2,7 @@
 extern int INDEX_RESOLUTION;
 extern int EXONGAP;
 extern int READLEN;
+extern int RQFACTOR;
 extern unsigned CONVERSION_FACTOR;
 extern char Char_To_CodeC[256];
 extern char Char_To_Code[256];

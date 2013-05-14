@@ -152,8 +152,8 @@ Five:
 			Hits+=Five_Mismatch(MC.Current_Tag,L,Max_Hits,fwfmi,revfmi,MC);
 	}
 
-	MF.Hit_Array[MF.Hit_Array_Ptr].Start=0;//MC.Hit_Array[MC.Hit_Array_Ptr].Start=0;//tag sentinels to sa lists..
-	MF.Hit_Array_Ptr++;//MC.Hit_Array_Ptr++;//Setup for suboptimal hits..
+	MF.Hit_Array[MF.Hit_Array_Ptr].Start=0;MC.Hit_Array[MC.Hit_Array_Ptr].Start=0;//tag sentinels to sa lists..
+	MF.Hit_Array_Ptr++;MC.Hit_Array_Ptr++;//Setup for suboptimal hits..
 	assert(In_Mis <= MAX_MISMATCHES);
 	//Top=Hits;
 	return (Hits ? In_Mis : -1) ;

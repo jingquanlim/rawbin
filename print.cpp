@@ -38,7 +38,7 @@ void Open_Outputs(ofstream & SAM,string filename)
 	}
 }
 
-inline char* Nullify_String(char* S)
+char* Nullify_String(char* S)
 {
 	char* Strend;
 	for(Strend=S;*Strend && *Strend!='\n';*Strend++);
@@ -71,7 +71,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 			Pair.y=Final_Juncs[i+j].q;
 			if(Final_Juncs[i+j].ID==INT_MAX-1) Final_Juncs[i].ID=A.ID;//Junction at extreme..
 			assert(Genome_Offsets[Final_Juncs[i+j].ID].Offset !=INT_MAX && Final_Juncs[i+j].ID==Final_Juncs[i].ID );
-			if(!Err) Genome_Offsets[Final_Juncs[i].ID].Junc_Hash->Insert(Pair,Final_Juncs[i+j],Hit_ID? false:true);
+			if(!Err && !Multi_Hits) Genome_Offsets[Final_Juncs[i].ID].Junc_Hash->Insert(Pair,Final_Juncs[i+j],Hit_ID? false:true);
 
 			assert(Label==Final_Juncs[i].Label);
 			CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM%dN",Final_Juncs[i+j].r,Final_Juncs[i+j].q-Final_Juncs[i+j].p+1);
