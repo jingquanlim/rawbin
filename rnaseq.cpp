@@ -1837,5 +1837,5 @@ void Print_Unmapped(READ & Head,int StringLength,ofstream & MISHIT)
 	Nullify_String(Head.Description);
 	Head.Quality[StringLength]=0;
 	Head.Tag_Copy[StringLength]=0;
-	MISHIT <<Head.Description<<"\t4\t*\t0\t0\t*\t*\t0\t0\t"<<Head.Tag_Copy<<"\t"<<Head.Quality<<endl;
+	MISHIT <<Head.Description+1<<"\t4\t*\t0\t0\t*\t*\t0\t0\t"<<Head.Tag_Copy<<"\t"<<Head.Quality<<endl;
 }

@@ -126,7 +126,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 void Print_SAM_Header(std::map <unsigned, Ann_Info> Annotations,int argc,char* argv[],char* Input_File)
 {
 	ofstream SAMHEAD;
-	SAMHEAD.open("header.sam");
+	SAMHEAD.open("0header.sam");
 	if(SAMHEAD.is_open())
 	{
 		std::map <unsigned, Ann_Info> ::iterator S,E;
