@@ -192,7 +192,7 @@ void Partial_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,MEM
 void Scan_Right_Read(char* Current_Tag,int StringLength,MEMX & Pre, MEMX & Suf,Transcript_Data & TD,char* Q);
 void Extension_Scan(char* Current_Tag,char* Current_Tag_ASCII,int StringLength,MEMX & Pre,MEMX & Suf,char Sign,Transcript_Data & TD,int & Err,char* Q);
 void Seek_Residue(int & GT_Ptr,int *GT,char* Current_Tag_ASCII,int StringLength,char* RightX,char* Q,char *Signal,unsigned Loc,Transcript_Data & TD,char Sign);
-void Print_Matches(MEMX & MF,MEMX & MC,READ & Head,ofstream & SAM,int StringLength,Offset_Record *Genome_Offsets);
+void Print_Matches(MEMX & MF,MEMX & MC,READ & Head,ofstream & SAM,int StringLength,Offset_Record *Genome_Offsets,int Mismatches);
 void Print_Unmapped(READ & Head,int StringLength,ofstream & MISHIT);
 //}-----------------------------  FUNCTION PRTOTYPES  -------------------------------------------------/*
 
@@ -329,7 +329,7 @@ void *Map(void *T)
 		int Mismatch_Scan=Scan_Both(MF,MC,INIT_MIS_SCAN,L_Long,fwfmi,revfmi,0,2);
 		if(Mismatch_Hit_Nice(Mismatch_Scan,MF,MC,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q,File_Info.STRINGLENGTH)) 
 		{
-			Print_Matches(MF,MC,Head,SAM[0],File_Info.STRINGLENGTH,Genome_Offsets);
+			Print_Matches(MF,MC,Head,SAM[0],File_Info.STRINGLENGTH,Genome_Offsets,Mismatch_Scan);
 			continue;
 		}
 
@@ -353,7 +353,7 @@ void *Map(void *T)
 		}
 		else if(Mismatch_Scan>=0)//revert to match..
 		{
-			Print_Matches(MF,MC,Head,SAM[0],File_Info.STRINGLENGTH,Genome_Offsets);
+			Print_Matches(MF,MC,Head,SAM[0],File_Info.STRINGLENGTH,Genome_Offsets,Mismatch_Scan);
 			continue;
 		}
 
@@ -393,9 +393,10 @@ void *Map(void *T)
 		}
 		else if(TD.Partial_Junctions_Ptr)
 		{
-			int Type=Canonical_Score(TD.Partial_Junctions[0].signal);
-			if(TD.Partial_Junctions_Ptr==1 && TD.Partial_Junctions[0].Junc_Count==1 && Type)
+			int Type=0;
+			if(TD.Partial_Junctions_Ptr==1 && TD.Partial_Junctions[0].Junc_Count==1 && (Type=Canonical_Score(TD.Partial_Junctions[0].signal)))
 			{
+				assert(Type);
 				selectedJunctions[0]=0;TD.Partial_Junctions[0].Type=Type;
 				Print_Hits(Head,TD.Partial_Junctions,SAM[0],selectedJunctions[0],0,Err,Genome_Offsets,false);//tempType);
 			}
@@ -1772,12 +1773,13 @@ void Seek_Residue(int & GT_Ptr,int *GT,char* Current_Tag_ASCII,int StringLength,
 }
 
 
-void Print_Matches(MEMX & MF,MEMX & MC,READ & Head,ofstream & SAM,int StringLength,Offset_Record *Genome_Offsets)
+void Print_Matches(MEMX & MF,MEMX & MC,READ & Head,ofstream & SAM,int StringLength,Offset_Record *Genome_Offsets,int Mismatches)
 {
 	unsigned Loc,Conversion_Factor=revfmi->textLength-StringLength+1;
 	if(MF.Hit_Array_Ptr) MF.Hit_Array_Ptr--;if(MC.Hit_Array_Ptr) MC.Hit_Array_Ptr--;
 	bool Multi_Hits=(1==MF.Hit_Array_Ptr+MC.Hit_Array_Ptr)? false:true;
 	Junction J;
+	J.Mismatches=Mismatches;
 	for(int i=0;i<MF.Hit_Array_Ptr;i++)
 	{
 		SARange SA=MF.Hit_Array[i];assert(SA.Start);
