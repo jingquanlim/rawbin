@@ -61,7 +61,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 
 		Ann_Info A;
 		char* CIGAR_ptr=CIGAR;
-		int Last=0;int Label=Final_Juncs[i].Label;
+		int Last=0;int Label=Final_Juncs[i].Label;int Bdr_Count=0;
 		for(int j=0;j<Final_Juncs[i].Junc_Count;j++)
 		{
 			Location_To_Genome(Final_Juncs[i+j].p,A);//TODO:one lookup should be enough..
@@ -104,6 +104,8 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 		Ann_Info A;
 		Location_To_Genome(Final_Juncs[i].p,A);
 		char *R=Head.Tag_Copy,*Q=Head.Quality;char RQ[MAXTAG],RR[MAXTAG];
+		if(!Final_Juncs[i].p || (Final_Juncs[i].p+READLEN > A.Size))//check for a Boundary Hit..
+			return;
 		if(!Final_Juncs[i].Sign)
 		{
 			Reverse_Read(RR,RQ,Head.Tag_Copy,Head.Quality,READLEN);
