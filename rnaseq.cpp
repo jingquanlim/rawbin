@@ -67,7 +67,7 @@ extern const int CANONICAL_SCORE=3;
 const int DUMMY_JUNC=1000;
 const int TRANCRIPT_END=1001;
 extern const bool DEBUG=false;
-const int QSUM_LIMIT=32;
+int QSUM_LIMIT=32;
 //const int QSUM_LIMIT=60;
 
 struct Transcript
@@ -87,6 +87,8 @@ const int POWLIMIT=300;
 bool DEEPSCAN=false;
 char Dummy_Q[]="IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII";
 float POW10[POWLIMIT];
+bool PRINT_NON_CANON=false;
+bool PRE_MAP=true;
 
 int TENMER=10;
 int RQFACTOR=18;
@@ -327,7 +329,7 @@ void *Map(void *T)
 		MF.Hits=0;MF.Hit_Array_Ptr=0;MF.Current_Tag=Head.Tag;MF_Pre.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
 		MC.Hits=0;MC.Hit_Array_Ptr=0;MC.Current_Tag=Rev_Bin;MC.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
 		int Mismatch_Scan=Scan_Both(MF,MC,INIT_MIS_SCAN,L_Long,fwfmi,revfmi,0,2);
-		if(Mismatch_Hit_Nice(Mismatch_Scan,MF,MC,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q,File_Info.STRINGLENGTH)) 
+		if(PRE_MAP && Mismatch_Hit_Nice(Mismatch_Scan,MF,MC,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q,File_Info.STRINGLENGTH)) 
 		{
 			Print_Matches(MF,MC,Head,SAM[0],File_Info.STRINGLENGTH,Genome_Offsets,Mismatch_Scan);
 			continue;
@@ -1304,7 +1306,7 @@ void Enum_Single_Junctions(char* Org_Read,char* Converted_Read,int Read_Skip,int
 				}
 			}
 			if(Junc_Already_Found) continue;
-			if(!Canonical_Score(Final_Juncs[i].signal)) 
+			if(!PRINT_NON_CANON && !Canonical_Score(Final_Juncs[i].signal)) 
 				continue;
 			TD.Trans_Array[Trans_Array_Ptr]=Final_Juncs[i];//.x=p;Trans_Array[Trans_Array_Ptr].y=q;
 			Seek_Junc(Converted_Read+r-Skip,R,0,Junc_Count+1,Mis_In_Junc_Count,q+1,StringLength-r,Trans_Array_Ptr+1,Pre,Suf,Inspected_Pairs,Err,Sign,TD,Q+r-Skip);

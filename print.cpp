@@ -6,6 +6,7 @@ extern const int UNIQUE_NOSIGNAL;//There is one junction, it does not have a sig
 extern const int NON_UNIQUE_SIGNAL;//There are many local junctions, but only one have a signal..
 //extern Offset_Record Genome_Offsets[];
 char const* Junc_Decode[]={"CAN","SEMI","SEMI","NON"};
+extern bool PRINT_NON_CANON;
 
 void Reverse_Read(char* RDest,char* QDest,char* R,char* Q,int StringLength)
 {
@@ -189,7 +190,7 @@ void Print_Junctions(char* Junction_File,Offset_Record *Genome_Offsets)
 		while (Junc_Not_Empty)
 		{
 			//if(JStat.Junc_Type)
-			if(JStat.Unique && JStat.Junc_Type)
+			if(JStat.Unique && (JStat.Junc_Type || PRINT_NON_CANON))
 			{
 
 				OP H,T;

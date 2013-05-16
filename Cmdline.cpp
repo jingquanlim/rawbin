@@ -9,6 +9,9 @@ extern int THREAD;
 extern int INIT_MIS_SCAN;
 extern int RQFACTOR;
 extern int MINX;
+extern bool PRINT_NON_CANON;
+extern bool PRE_MAP;
+extern int QSUM_LIMIT;
 option Long_Options[]=
 {
 {"help",0,NULL,'h'},
@@ -21,7 +24,7 @@ option Long_Options[]=
 void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 {
 	int Current_Option=0;
-	char Short_Options[] ="R:jM:bhq:t:g:G:n:N:o:w:mprO::T:";//allowed options....
+	char Short_Options[] ="R:jM:bhq:t:g:G:n:N:o:w:mprO::T:CPQ:";//allowed options....
 	char* This_Program = argv[0];//Current program name....
 	char Help_String[]=
 "Parameters:\n"
@@ -67,14 +70,23 @@ void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 				else CL.PATTERNFILE1=optarg;
 				CL.Patternfile_Count++;
 				break;
+			case 'Q':
+				QSUM_LIMIT=atoi(optarg);
+				break;
 			case 'G':
 				CL.EXONGAP=atoi(optarg);
 				break;
 			case 'o':
 				CL.JUNCTIONFILE=optarg;
 				break;
+			case 'C':
+				PRINT_NON_CANON=true;
+				break;
 			case 'n':
 				INIT_MIS_SCAN=atoi(optarg);
+				break;
+			case 'P':
+				PRE_MAP=false;
 				break;
 			case 'R':
 				RQFACTOR=atoi(optarg);
