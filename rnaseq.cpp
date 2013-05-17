@@ -60,7 +60,6 @@ extern const int UNIQUE_NOSIGNAL=1;
 extern const int NON_UNIQUE_SIGNAL=2;
 extern const int NON_UNIQUE_OTHERS=3;
 //extern const int MINX=18;//Minimum extension..
-extern const int MIS_DENSITY=1;
 extern const int EXON_GEN_LEN=5000;
 extern const int CANONICAL_SCORE=3;
 
@@ -91,6 +90,7 @@ bool PRINT_NON_CANON=false;
 bool PRE_MAP=true;
 
 int TENMER=10;
+int MIS_DENSITY=1;
 int RQFACTOR=18;
 int MINX=18;
 int INDEX_RESOLUTION=30000;
@@ -858,6 +858,12 @@ int Find_Single_Junc(char* Read,char* Read_Head,char* Converted_Read,MEMX & MF_P
 		Err+=Find_Pairings(Pairs_Index,MF_Pre.Hit_Array,MF_Suf.Hit_Array,Pairs,Read,Read_Head,STRINGLENGTH,Final_Juncs_Ptr,Final_Juncs,Min_Mismatch,Mis_In_Head,Last_Mis_Suf,Skip,Label,Sign);
 	}
 	else return 0;//no anchors
+
+	if (!MIS_DENSITY || Err)
+	{
+		Final_Juncs[Final_Juncs_Ptr].p=UINT_MAX;
+		return Final_Juncs_Ptr;
+	}
 	/*if (Final_Juncs_Ptr || Err)
 	{
 		Final_Juncs[Final_Juncs_Ptr].p=UINT_MAX;
@@ -1097,7 +1103,7 @@ int Seek_Junc(char* S,SARange R,int Read_Skip,int Junc_Count,int Mis_In_Junc_Cou
 				Junction J;J.Sign=(Sign)? 1:0;J.Mismatches=R.Mismatches;J.Junc_Count=0;
 				if (Last_Exon!=UINT_MAX)//one hit.. 
 				{
-					J.p=Last_Exon;
+					J.p=Last_Exon+1;
 					J.r=J.q=0;
 					if(TD.Compiled_Junctions_Ptr<MAX_JUNCS_ALLOWED)
 					{
