@@ -1,5 +1,4 @@
 #include "Print.h"
-extern int READLEN;
 extern char Char_To_CodeC[];
 extern const int UNIQUE_SIGNAL;//there is one junction, it has a signal
 extern const int UNIQUE_NOSIGNAL;//There is one junction, it does not have a signal..
@@ -47,7 +46,7 @@ char* Nullify_String(char* S)
 	return Strend;
 }
 
-void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal,unsigned Hit_ID,int Err,Offset_Record *Genome_Offsets,bool Multi_Hits)
+void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal,unsigned Hit_ID,int Err,Offset_Record *Genome_Offsets,bool Multi_Hits,int READLEN,int Read_Skip)
 {
 	Nullify_String(Head.Description+1);
 	Nullify_String(Head.Tag_Copy);
@@ -63,6 +62,8 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 		Ann_Info A;
 		char* CIGAR_ptr=CIGAR;
 		int Last=0;int Label=Final_Juncs[i].Label;int Bdr_Count=0;
+		if(Read_Skip>0)
+			CIGAR_ptr+=sprintf(CIGAR_ptr,"%dS",Read_Skip);
 		for(int j=0;j<Final_Juncs[i].Junc_Count;j++)
 		{
 			Location_To_Genome(Final_Juncs[i+j].p,A);//TODO:one lookup should be enough..
@@ -78,7 +79,9 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 			CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM%dN",Final_Juncs[i+j].r,Final_Juncs[i+j].q-Final_Juncs[i+j].p+1);
 			Last+=Final_Juncs[i+j].r;
 		}
-		sprintf(CIGAR_ptr,"%dM",READLEN-Last);
+		CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM",READLEN-Last);
+		if(Read_Skip<0)
+			sprintf(CIGAR_ptr,"%dS",-Read_Skip);
 
 		char *R=Head.Tag_Copy,*Q=Head.Quality;char RQ[MAXTAG],RR[MAXTAG];
 		if(!Final_Juncs[i].Sign)
@@ -117,9 +120,15 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 			<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  /*Flag*/
 			<< A.Name <<"\t" 
 			<< Final_Juncs[i].p << "\t" 
-			<< (int)((Multi_Hits)? 0:60) <<"\t" 
-			<< READLEN << "M\t"  
-			<< "*\t0\t0\t" 
+			<< (int)((Multi_Hits)? 0:60) <<"\t";
+
+		if(Read_Skip>0)
+			SAM << Read_Skip<<"S";
+		SAM << READLEN << "M";  
+		if(Read_Skip<0)
+			SAM << -Read_Skip<<"S";
+
+		SAM	<< "\t*\t0\t0\t" 
 			<< R << "\t" 
 			<< Q << "\t"
 			<< "XH:i:" << Final_Juncs[i].Mismatches <<"\t" <<"XS:A:." <<"\tER:i:"<<Err<<endl;
