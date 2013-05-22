@@ -6,6 +6,7 @@ extern const int NON_UNIQUE_SIGNAL;//There are many local junctions, but only on
 //extern Offset_Record Genome_Offsets[];
 char const* Junc_Decode[]={"CAN","SEMI","SEMI","NON"};
 extern bool PRINT_NON_CANON;
+extern bool SOFTCLIP;
 
 void Reverse_Read(char* RDest,char* QDest,char* R,char* Q,int StringLength)
 {
@@ -63,7 +64,15 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 		char* CIGAR_ptr=CIGAR;
 		int Last=0;int Label=Final_Juncs[i].Label;int Bdr_Count=0;
 		if(Read_Skip>0)
-			CIGAR_ptr+=sprintf(CIGAR_ptr,"%dS",Read_Skip);
+		{
+			if(SOFTCLIP)
+				CIGAR_ptr+=sprintf(CIGAR_ptr,"%dS",Read_Skip);
+			else
+			{
+			Final_Juncs[i].r+=Read_Skip;
+			READLEN+=Read_Skip;
+			}
+		}
 		for(int j=0;j<Final_Juncs[i].Junc_Count;j++)
 		{
 			Location_To_Genome(Final_Juncs[i+j].p,A);//TODO:one lookup should be enough..
@@ -79,9 +88,17 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 			CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM%dN",Final_Juncs[i+j].r,Final_Juncs[i+j].q-Final_Juncs[i+j].p+1);
 			Last+=Final_Juncs[i+j].r;
 		}
+		if(!SOFTCLIP)
+		{
+			if(Read_Skip<0)
+				READLEN-=Read_Skip;
+		}
 		CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM",READLEN-Last);
-		if(Read_Skip<0)
-			sprintf(CIGAR_ptr,"%dS",-Read_Skip);
+		if(SOFTCLIP)
+		{
+			if(Read_Skip<0)
+				sprintf(CIGAR_ptr,"%dS",-Read_Skip);
+		}
 
 		char *R=Head.Tag_Copy,*Q=Head.Quality;char RQ[MAXTAG],RR[MAXTAG];
 		if(!Final_Juncs[i].Sign)
@@ -115,19 +132,38 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 			Reverse_Read(RR,RQ,Head.Tag_Copy,Head.Quality,READLEN);
 			Q=RQ;R=RR;
 		}
-
+/////////////////////////////////////////////////////////
+		if(!SOFTCLIP)
+		{
+			if(Read_Skip>0)
+			{
+				Final_Juncs[i].p-=Read_Skip;
+				READLEN+=Read_Skip;
+				if(Final_Juncs[i].p ==0) 
+					return;
+			}
+			else if(Read_Skip<0)
+			{
+				READLEN-=Read_Skip;
+			}
+		}
+/////////////////////////////////////////////////////////
 		SAM << Head.Description+1 <<"\t"
 			<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  /*Flag*/
 			<< A.Name <<"\t" 
 			<< Final_Juncs[i].p << "\t" 
 			<< (int)((Multi_Hits)? 0:60) <<"\t";
 
-		if(Read_Skip>0)
-			SAM << Read_Skip<<"S";
-		SAM << READLEN << "M";  
-		if(Read_Skip<0)
-			SAM << -Read_Skip<<"S";
-
+		if(SOFTCLIP)
+		{
+			if(Read_Skip>0)
+				SAM << Read_Skip<<"S";
+			SAM << READLEN << "M";  
+			if(Read_Skip<0)
+				SAM << -Read_Skip<<"S";
+		}
+		else
+			SAM << READLEN << "M";  
 		SAM	<< "\t*\t0\t0\t" 
 			<< R << "\t" 
 			<< Q << "\t"

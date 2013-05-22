@@ -13,6 +13,7 @@ extern bool PRINT_NON_CANON;
 extern bool PRE_MAP;
 extern int QSUM_LIMIT;
 extern int MIS_DENSITY;
+extern bool SOFTCLIP;
 option Long_Options[]=
 {
 {"help",0,NULL,'h'},
@@ -25,7 +26,7 @@ option Long_Options[]=
 void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 {
 	int Current_Option=0;
-	char Short_Options[] ="R:jM:bhq:t:g:G:n:N:o:w:m:prO::T:CPQ:";//allowed options....
+	char Short_Options[] ="R:jM:bhq:t:g:G:n:N:o:w:m:prO::T:CPQ:S";//allowed options....
 	char* This_Program = argv[0];//Current program name....
 	char Help_String[]=
 "Parameters:\n"
@@ -73,6 +74,9 @@ void Parse_Command_line(int argc, char* argv[],Index_Info & Ind,Parameters & CL)
 				break;
 			case 'Q':
 				QSUM_LIMIT=atoi(optarg);
+				break;
+			case 'S':
+				SOFTCLIP=false;
 				break;
 			case 'G':
 				CL.EXONGAP=atoi(optarg);

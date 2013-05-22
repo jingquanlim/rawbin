@@ -81,6 +81,7 @@ const int MAX_JUNCS_IN_TRANSCRIPT=20;//Maximum number of junctions that are allo
 const int MAX_INSPECTED_PAIRS=20000;//INT_MAX;
 const int QUALITYCONVERSIONFACTOR=33;
 bool ONEMULTIHIT=true;
+bool SOFTCLIP=true;
 
 const int POWLIMIT=300;
 bool DEEPSCAN=false;
