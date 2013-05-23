@@ -7,6 +7,7 @@ extern const int NON_UNIQUE_SIGNAL;//There are many local junctions, but only on
 char const* Junc_Decode[]={"CAN","SEMI","SEMI","NON"};
 extern bool PRINT_NON_CANON;
 extern bool SOFTCLIP;
+extern int READLEN;
 
 void Reverse_Read(char* RDest,char* QDest,char* R,char* Q,int StringLength)
 {
@@ -47,7 +48,7 @@ char* Nullify_String(char* S)
 	return Strend;
 }
 
-void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal,unsigned Hit_ID,int Err,Offset_Record *Genome_Offsets,bool Multi_Hits,int READLEN,int Read_Skip)
+void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal,unsigned Hit_ID,int Err,Offset_Record *Genome_Offsets,bool Multi_Hits,int READLENX,int Read_Skip)
 {
 	Nullify_String(Head.Description+1);
 	Nullify_String(Head.Tag_Copy);
@@ -70,7 +71,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 			else
 			{
 			Final_Juncs[i].r+=Read_Skip;
-			READLEN+=Read_Skip;
+			READLENX+=Read_Skip;
 			}
 		}
 		for(int j=0;j<Final_Juncs[i].Junc_Count;j++)
@@ -91,9 +92,9 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 		if(!SOFTCLIP)
 		{
 			if(Read_Skip<0)
-				READLEN-=Read_Skip;
+				READLENX-=Read_Skip;
 		}
-		CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM",READLEN-Last);
+		CIGAR_ptr+=sprintf(CIGAR_ptr,"%dM",READLENX-Last);
 		if(SOFTCLIP)
 		{
 			if(Read_Skip<0)
@@ -138,13 +139,13 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 			if(Read_Skip>0)
 			{
 				Final_Juncs[i].p-=Read_Skip;
-				READLEN+=Read_Skip;
+				READLENX+=Read_Skip;
 				if(Final_Juncs[i].p ==0) 
 					return;
 			}
 			else if(Read_Skip<0)
 			{
-				READLEN-=Read_Skip;
+				READLENX-=Read_Skip;
 			}
 		}
 /////////////////////////////////////////////////////////
@@ -158,12 +159,12 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 		{
 			if(Read_Skip>0)
 				SAM << Read_Skip<<"S";
-			SAM << READLEN << "M";  
+			SAM << READLENX << "M";  
 			if(Read_Skip<0)
 				SAM << -Read_Skip<<"S";
 		}
 		else
-			SAM << READLEN << "M";  
+			SAM << READLENX << "M";  
 		SAM	<< "\t*\t0\t0\t" 
 			<< R << "\t" 
 			<< Q << "\t"
