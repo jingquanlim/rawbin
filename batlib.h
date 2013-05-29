@@ -41,7 +41,7 @@ void Build_Tables(BWT *fwfmi, BWT *revfmi,MEMLOOK & M);
 void Build_Preindex_Backward(BWT *fwfmi,Range Range, int Level, int Bit, const MEMLOOK & M);
 void Build_Preindex_Forward(BWT *revfmi, Range Range, int Level, int Bit,  const MEMLOOK & M);
 
-char Read_Tag(FILE *Input_File,const char FILETYPE,READ & Read );
+char Read_Tag(FILE *Input_File,const char FILETYPE, READ & Read,SAMREAD & SAM );
 void Process_Read(READ & R, BATREAD & B,MEMX & MF, MEMX & MC);
 void Recalibrate_Read(READ & R, BATREAD & B,MEMX & MF, MEMX & MC,LEN & L);
 

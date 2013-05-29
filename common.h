@@ -30,6 +30,7 @@ extern "C"
 	#include "TextConverter.h"
 	#include "BWT.h"
 }
+int const MAX_CIGLEN=50;
 
 //{-----------------------------  STRUCTS  -------------------------------------------------/
 struct Ann_Info
@@ -147,6 +148,16 @@ struct READ
 	char Complement[MAXTAG+1];
 	int NCount;
 	unsigned char N[500];
+};
+
+struct SAMREAD
+{
+	char Chr[20];
+	unsigned Loc;
+	int MapQ; 
+	char Cigar[MAX_CIGLEN+1];
+	char SAM_Line[5000];
+	bool Enable;
 };
 
 /*struct READ

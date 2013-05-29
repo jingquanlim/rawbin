@@ -13,7 +13,8 @@ extern int *SA_Blocks;
 extern std::map <unsigned, Ann_Info> Annotations;
 extern unsigned Location_Array[80];
 extern pthread_mutex_t OpenGenomeFileslock;
-
+extern bool SAM_READER;
+extern int ORG_STRINGLENGTH; 
 void Init(BWT *revfmi,unsigned & SOURCELENGTH,FILE* & Input_File,FILE* & Mate_File,FILETYPE & File_Info,Parameters & CL,Index_Info & Genome_Files,int & INIT_MIS_SCAN)
 {
 	EXONGAP=CL.EXONGAP;
@@ -30,7 +31,39 @@ void Init(BWT *revfmi,unsigned & SOURCELENGTH,FILE* & Input_File,FILE* & Mate_Fi
 	Char_To_CodeC['-']='-';Char_To_CodeC['+']='+';//we are using character count to store the fmicode for acgt
 
 	Open_Files(Input_File,Mate_File,CL);
-	Detect_Input(File_Info,Input_File,Mate_File);
+	if(SAM_READER)
+	{
+		char SAM_Line[5000];
+		int Flag;READ Head;SAMREAD SAM;
+		if (fgets(SAM_Line,5000,Input_File)!=0)// read a tag...
+		{
+			sscanf(SAM_Line,"%s %d %s %u %d %s %s %*d %*d %s ",Head.Description,&Flag,SAM.Chr,&SAM.Loc,&SAM.MapQ,SAM.Cigar,Head.Quality,Head.Tag_Copy); 
+		}
+		else
+		{
+			cout << "Init():Error reading file..\n";exit (100);
+		}
+		File_Info.STRINGLENGTH=strlen(Head.Tag_Copy);
+		if (Head.Quality[0]=='*')
+		{
+		       	File_Info.FILETYPE=FA;
+		}
+		else 
+		{
+			assert(strlen(Head.Quality)==File_Info.STRINGLENGTH);
+			File_Info.FILETYPE=FQ;
+		}
+
+		fseek(Input_File, 0L, SEEK_END);
+		File_Info.File_Size = ftello64(Input_File);
+		File_Info.Org_File=Input_File;
+		fseek(Input_File,0,SEEK_SET);//go top
+
+		READLEN=File_Info.TAG_COPY_LEN=File_Info.STRINGLENGTH;
+		ORG_STRINGLENGTH=READLEN;
+	}
+	else
+		Detect_Input(File_Info,Input_File,Mate_File);
 	FILE* Inf_File;
 	if((Inf_File=File_Exist_Open(Genome_Files.INFOFILE)))
 	{

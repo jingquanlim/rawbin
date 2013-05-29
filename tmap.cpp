@@ -179,7 +179,8 @@ void *Map(void *T)
 	fprintf(stderr,"======================]\r[");//progress bar....
 	int Actual_Tag=0;
 	READ Head,Tail;
-	while (Read_Tag(Head,Tail,Input_File,Mate_File,File_Info))
+	SAMREAD SAMRead_Dummy;
+	while (Read_Tag(Head,Tail,Input_File,Mate_File,File_Info,SAMRead_Dummy))
 	{
 		if(Head.NCount>2) continue;
 		if(Thread_ID==1 && !Progress_Bar(CL,Number_of_Tags,Progress,Tag_Count,File_Info)) break;

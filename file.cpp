@@ -9,6 +9,7 @@ extern char Char_To_CodeC[];
 extern char Char_To_Code[];
 extern int READLEN;
 extern int ORG_STRINGLENGTH;
+extern bool SAM_READER;
 /* 
  * ===  FUNCTION  ======================================================================
  *         Name:  File_Open
@@ -119,14 +120,50 @@ void Detect_Input(FILETYPE & P, FILE* & Input_File,FILE* & Mate_File)
  * =====================================================================================
  */
 
-char Read_Tag(READ & Head,READ & Tail,FILE* & Input_File,FILE* & Mate_File,FILETYPE & F)
+char Read_Tag(READ & Head,READ & Tail,FILE* & Input_File,FILE* & Mate_File,FILETYPE & F,SAMREAD & SAM)
 {
 	flockfile(Input_File);
 	char * Current_Tag;
 	static int Random_Pointer=0;
-
 	Current_Tag=Head.Tag;
-	if (fgets(Head.Description,MAXDES,Input_File)!=0)// read a tag...
+
+	if(SAM.Enable) 
+	{
+		int Flag;
+		if (fgets(SAM.SAM_Line,5000,Input_File)!=0)// read a tag...
+		{
+			funlockfile(Input_File);
+			sscanf(SAM.SAM_Line,"%s %d %s %u %d %s %s %*d %*d %s ",Head.Description,&Flag,SAM.Chr,&SAM.Loc,&SAM.MapQ,SAM.Cigar,Head.Quality,Head.Tag); 
+
+			strcpy(Head.Tag_Copy,Head.Tag);
+			Head.NCount=0;int j=0;
+			for (unsigned i=0;i<=F.STRINGLENGTH-1;i++)
+			{
+				if (Current_Tag[i] == 'n' || Current_Tag[i]=='N')
+				{
+					Head.N[j++]=i;Head.NLocations[i]=TRUE;Head.NCount++;
+					Current_Tag[i]=Random_Array[Random_Pointer++];Head.N[j++]=Current_Tag[i];
+					if (Random_Pointer==sizeof(Random_Array)-1) Random_Pointer=0; 
+				}
+				else Head.NLocations[i]=FALSE;
+				if (Head.Tag_Copy[i]>='a') 
+				{
+					Head.Tag_Copy[i]-=('a'-'A'); 
+				}
+				Current_Tag[i]=Char_To_Code[Current_Tag[i]];
+				Head.Complement[F.STRINGLENGTH-1-i]=Char_To_CodeC[Current_Tag[i]];
+			}
+			Current_Tag[F.STRINGLENGTH]='+';
+			Head.Complement[F.STRINGLENGTH]='-';
+			return TRUE;
+		}
+		else
+		{
+			funlockfile(Input_File);
+			return FALSE;
+		}
+	}
+	else if (fgets(Head.Description,MAXDES,Input_File)!=0)// read a tag...
 	{
 		fgets(Head.Tag,MAXDES,Input_File);//tag
 		if (F.FILETYPE == FQ)

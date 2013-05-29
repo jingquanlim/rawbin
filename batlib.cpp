@@ -29,6 +29,7 @@ extern unsigned Conversion_Factor;
 extern LEN GlobL;
 extern char* LOG_SUCCESS_FILE;
 extern FILE* Log_SFile;
+extern bool SAMREADER;
 
 //{-----------------------------------  INIT ---------------------------------------------------------
 /* 
@@ -385,8 +386,9 @@ void fprintfX(void* Handle,char* Format, char* String)
  *  		  return true if successfull...
  * =====================================================================================
  */
-char Read_Tag(FILE *Input_File,const char FILETYPE, READ & Read )
+char Read_Tag(FILE *Input_File,const char FILETYPE, READ & Read,SAMREAD & SAM )
 {
+	
 	flockfile(Input_File);
 	if (fgets(Read.Description,MAXDES,Input_File)!=0)// read a tag...
 	{

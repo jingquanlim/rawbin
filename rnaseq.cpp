@@ -97,6 +97,7 @@ int MINX=18;
 int INDEX_RESOLUTION=30000;
 int EXONGAP;
 int READLEN;
+bool SAM_READER=true;
 unsigned CONVERSION_FACTOR;
 char* LOG_SUCCESS_FILE=NULL;
 FILE *Log_SFile;
@@ -181,6 +182,7 @@ int getBest(char* Current_Tag,int StringLength,Junction * Final_Juncs, int * app
 void Reset_MEMX(MEMX & M);
 bool Exons_Too_Small(int Trans_Array_Ptr,Transcript_Data & TD);
 void *Map(void *T);
+bool Messy_CIGAR(char *Cig,int StringLength);
 void Join_Tables(Offset_Record *Genome_Offsets,int Thread_ID);
 void Launch_Threads(int NTHREAD, void* (*Map_t)(void*),Thread_Arg T);
 void Set_Affinity();
@@ -282,6 +284,7 @@ void *Map(void *T)
 //------------------- INIT -------------------------------------------------------------
 
 	READ Head,Tail;
+	SAMREAD SAM_Read;SAM_Read.Enable=SAM_READER;
 	int LOOKUPSIZE=3;
 	MEMLOOK MLook;MLook.Lookupsize=3;
 	MEMLOOK MLook_Long;MLook_Long.Lookupsize=6;
@@ -307,7 +310,8 @@ void *Map(void *T)
 	fprintf(stderr,"======================]\r[");//progress bar....
 	int Actual_Tag=0;
 	int selectedJunctions[MAX_JUNCS_ALLOWED+1];
-	while (Read_Tag(Head,Tail,Input_File,Mate_File,File_Info))
+	if(SAM_READER) PRE_MAP=false;
+	while (Read_Tag(Head,Tail,Input_File,Mate_File,File_Info,SAM_Read))
 	{
 		if(Thread_ID==1 && !Progress_Bar(CL,Number_of_Tags,Progress,Tag_Count,File_Info)) break;
 		if(CL.MAX_TAGS_TO_PROCESS && CL.MAX_TAGS_TO_PROCESS<Actual_Tag) break;
@@ -330,18 +334,18 @@ void *Map(void *T)
 		Convert_Reverse(Head.Tag,Rev,Rev_Bin,File_Info.STRINGLENGTH);
 		MF.Hits=0;MF.Hit_Array_Ptr=0;MF.Current_Tag=Head.Tag;MF_Pre.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
 		MC.Hits=0;MC.Hit_Array_Ptr=0;MC.Current_Tag=Rev_Bin;MC.Hit_Array[0].Start=0;//setup read details to alignmentstructure..
-		int Mismatch_Scan=Scan_Both(MF,MC,INIT_MIS_SCAN,L_Long,fwfmi,revfmi,0,2);
-		if(PRE_MAP && Mismatch_Hit_Nice(Mismatch_Scan,MF,MC,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q,File_Info.STRINGLENGTH)) 
+		int Mismatch_Scan= -1;//Scan_Both(MF,MC,INIT_MIS_SCAN,L_Long,fwfmi,revfmi,0,2);
+		/*if(PRE_MAP && Mismatch_Hit_Nice(Mismatch_Scan,MF,MC,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q,File_Info.STRINGLENGTH)) 
 		{
 			Print_Matches(MF,MC,Head,SAM[0],READLEN_T,Genome_Offsets,Mismatch_Scan);
 			continue;
+		}*/
+		if(SAM_Read.MapQ && !Messy_CIGAR(SAM_Read.Cigar,File_Info.STRINGLENGTH))
+		{
+			SAM[0] << SAM_Read.SAM_Line;
 		}
 
 		Head.Tag_Copy[READLEN_T]=0;
-		if(!strcmp(Head.Tag_Copy,"GCCAATCACAAGTAACTATGATGCCCAAGCAGATGAGGACCATTCCTGCCAGCCCCAAACGGATGAGGTTTCCCTGGGTATAGTCCAAGGAGCCAGAACCTTCGAAACTGATGACCAGTG"))
-		{
-			cout <<"Found\n";
-		}
 		int Err=Seek_All_Junc(Head.Tag,READLEN_T,MF_Pre,MF_Suf,TD,(File_Info.FILETYPE==FQ)? Head.Quality:Dummy_Q);
 		TD.Compiled_Junctions[TD.Compiled_Junctions_Ptr].p=UINT_MAX;
 
@@ -1878,4 +1882,34 @@ void Print_Unmapped(READ & Head,int StringLength,ofstream & MISHIT)
 	Head.Quality[StringLength]=0;
 	Head.Tag_Copy[StringLength]=0;
 	MISHIT <<Head.Description+1<<"\t4\t*\t0\t0\t*\t*\t0\t0\t"<<Head.Tag_Copy<<"\t"<<Head.Quality<<endl;
+}
+
+bool Messy_CIGAR(char *Cig,int StringLength)
+{
+	char* Int_Start=Cig;
+	int Len=0,Max_Len=0;
+	for(;*Cig;Cig++)
+	{
+		if(*Cig=='M')
+		{
+			*Cig=0;
+			Len=atoi(Int_Start);*Cig='M';
+			if(Max_Len<Len)
+			{
+				Max_Len=Len;
+			}
+			Int_Start=Cig+1;
+		}
+		else if(!isdigit(*Cig))
+		{
+			Int_Start=Cig+1;
+		}
+	}
+	assert(StringLength>=Max_Len);
+	if(!Max_Len)
+		return true;
+	if(StringLength-Max_Len>=5)
+		return true;
+	else
+		return false;
 }

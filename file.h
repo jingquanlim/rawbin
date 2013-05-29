@@ -43,6 +43,6 @@ FILE* File_Exist_Open(const char* File_Name);
 gzFile File_OpenZ(const char* File_Name,const char* Mode);
 unsigned Get_File_Size(FILE* File);
 void Detect_Input(FILETYPE & P, FILE* & Input_File,FILE* & Mate_File);
-char Read_Tag(READ & Head,READ & Tail,FILE* & Input_File,FILE* & Mate_File,FILETYPE & F);
+char Read_Tag(READ & Head,READ & Tail,FILE* & Input_File,FILE* & Mate_File,FILETYPE & F,SAMREAD & SAM);
 void Open_Files(FILE* & Input_File,FILE* & Mate_File,Parameters P);
 #endif
