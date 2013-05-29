@@ -343,6 +343,7 @@ void *Map(void *T)
 		if(SAM_Read.MapQ && !Messy_CIGAR(SAM_Read.Cigar,File_Info.STRINGLENGTH))
 		{
 			SAM[0] << SAM_Read.SAM_Line;
+			continue;
 		}
 
 		Head.Tag_Copy[READLEN_T]=0;

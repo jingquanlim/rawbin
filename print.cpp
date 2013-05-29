@@ -7,6 +7,7 @@ extern const int NON_UNIQUE_SIGNAL;//There are many local junctions, but only on
 char const* Junc_Decode[]={"CAN","SEMI","SEMI","NON"};
 extern bool PRINT_NON_CANON;
 extern bool SOFTCLIP;
+extern bool SAM_READER;
 extern int READLEN;
 
 void Reverse_Read(char* RDest,char* QDest,char* R,char* Q,int StringLength)
@@ -57,6 +58,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 	char CIGAR[500];
 	
 	int i=firstSignal;
+	int Off_Des=1;if(SAM_READER) Off_Des=0;
 	if(Final_Juncs[i].q)
 	{
 		OP Pair;
@@ -108,7 +110,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 			Q=Head.Quality;R=Head.Tag_Copy;
 		}
 
-		SAM << Head.Description+1 <<"\t"
+		SAM << Head.Description+Off_Des <<"\t"
 			<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  
 			<< A.Name <<"\t" 
 			<< Final_Juncs[i].p-Final_Juncs[i].r+1 << "\t" 
@@ -149,7 +151,7 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 			}
 		}
 /////////////////////////////////////////////////////////
-		SAM << Head.Description+1 <<"\t"
+		SAM << Head.Description+Off_Des <<"\t"
 			<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  /*Flag*/
 			<< A.Name <<"\t" 
 			<< Final_Juncs[i].p << "\t" 
