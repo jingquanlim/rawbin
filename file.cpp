@@ -123,7 +123,6 @@ void Detect_Input(FILETYPE & P, FILE* & Input_File,FILE* & Mate_File)
 
 char Read_Tag(READ & Head,READ & Tail,FILE* & Input_File,FILE* & Mate_File,FILETYPE & F,SAMREAD & SAM)
 {
-	flockfile(Input_File);
 	char * Current_Tag;
 	static int Random_Pointer=0;
 	Current_Tag=Head.Tag;
@@ -132,6 +131,7 @@ char Read_Tag(READ & Head,READ & Tail,FILE* & Input_File,FILE* & Mate_File,FILET
 	{
 		int Flag;
 Read_Again:
+		flockfile(Input_File);
 		if (fgets(SAM.SAM_Line,5000,Input_File)!=0)// read a tag...
 		{
 			char NM[10];

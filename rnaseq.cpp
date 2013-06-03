@@ -340,7 +340,7 @@ void *Map(void *T)
 			Print_Matches(MF,MC,Head,SAM[0],READLEN_T,Genome_Offsets,Mismatch_Scan);
 			continue;
 		}*/
-		if(SAM_Read.NM<=5 && !Messy_CIGAR(SAM_Read.Cigar,File_Info.STRINGLENGTH))
+		if(SAM_Read.NM<1 && !Messy_CIGAR(SAM_Read.Cigar,File_Info.STRINGLENGTH))
 		{
 			SAM[0] << SAM_Read.SAM_Line;
 			continue;
