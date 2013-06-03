@@ -35,8 +35,11 @@ void Init(BWT *revfmi,unsigned & SOURCELENGTH,FILE* & Input_File,FILE* & Mate_Fi
 	{
 		char SAM_Line[5000];
 		int Flag;READ Head;SAMREAD SAM;
+Read_Again:
 		if (fgets(SAM_Line,5000,Input_File)!=0)// read a tag...
 		{
+			if(*SAM_Line=='@')
+				goto Read_Again;
 			sscanf(SAM_Line,"%s %d %s %u %d %s %s %*d %*d %s ",Head.Description,&Flag,SAM.Chr,&SAM.Loc,&SAM.MapQ,SAM.Cigar,Head.Quality,Head.Tag_Copy); 
 		}
 		else

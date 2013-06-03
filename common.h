@@ -158,6 +158,7 @@ struct SAMREAD
 	char Cigar[MAX_CIGLEN+1];
 	char SAM_Line[5000];
 	bool Enable;
+	int NM;
 };
 
 /*struct READ

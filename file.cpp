@@ -4,6 +4,7 @@
 #include "common.h"
 #include "const.h"
 #include "file.h"
+#include "assert.h"
 
 extern char Char_To_CodeC[];
 extern char Char_To_Code[];
@@ -130,10 +131,19 @@ char Read_Tag(READ & Head,READ & Tail,FILE* & Input_File,FILE* & Mate_File,FILET
 	if(SAM.Enable) 
 	{
 		int Flag;
+Read_Again:
 		if (fgets(SAM.SAM_Line,5000,Input_File)!=0)// read a tag...
 		{
+			char NM[10];
 			funlockfile(Input_File);
-			sscanf(SAM.SAM_Line,"%s %d %s %u %d %s %s %*d %*d %s ",Head.Description,&Flag,SAM.Chr,&SAM.Loc,&SAM.MapQ,SAM.Cigar,Head.Quality,Head.Tag); 
+			if(*SAM.SAM_Line=='@')
+				goto Read_Again;
+			sscanf(SAM.SAM_Line,"%s %d %s %u %d %s %*s %*d %*d %s %s %s",Head.Description,&Flag,SAM.Chr,&SAM.Loc,&SAM.MapQ,SAM.Cigar,Head.Tag,Head.Quality,NM); 
+			if(Flag!=4)
+			{
+				assert(*NM=='N');
+				SAM.NM=atoi(NM+5);
+			}
 
 			strcpy(Head.Tag_Copy,Head.Tag);
 			Head.NCount=0;int j=0;

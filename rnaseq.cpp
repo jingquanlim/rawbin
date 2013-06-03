@@ -340,7 +340,7 @@ void *Map(void *T)
 			Print_Matches(MF,MC,Head,SAM[0],READLEN_T,Genome_Offsets,Mismatch_Scan);
 			continue;
 		}*/
-		if(SAM_Read.MapQ && !Messy_CIGAR(SAM_Read.Cigar,File_Info.STRINGLENGTH))
+		if(SAM_Read.NM<=5 && !Messy_CIGAR(SAM_Read.Cigar,File_Info.STRINGLENGTH))
 		{
 			SAM[0] << SAM_Read.SAM_Line;
 			continue;
@@ -424,10 +424,16 @@ void *Map(void *T)
 					}
 				}
 				else
-					Print_Unmapped(Head,File_Info.STRINGLENGTH,SAM[0]);
+				{
+					SAM[0] << SAM_Read.SAM_Line;
+					//Print_Unmapped(Head,File_Info.STRINGLENGTH,SAM[0]);
+				}
 			} 
 			else
-				Print_Unmapped(Head,File_Info.STRINGLENGTH,SAM[0]);
+			{
+				SAM[0] << SAM_Read.SAM_Line;
+				//Print_Unmapped(Head,File_Info.STRINGLENGTH,SAM[0]);
+			}
 
 		}
 		else if(TD.Partial_Junctions_Ptr)
@@ -440,10 +446,16 @@ void *Map(void *T)
 				Print_Hits(Head,TD.Partial_Junctions,SAM[0],selectedJunctions[0],0,Err,Genome_Offsets,false,READLEN_T,Real_Skip);
 			}
 			else
-				Print_Unmapped(Head,File_Info.STRINGLENGTH,SAM[0]);
+			{
+				SAM[0] << SAM_Read.SAM_Line;
+				//Print_Unmapped(Head,File_Info.STRINGLENGTH,SAM[0]);
+			}
 		}
 		else
-			Print_Unmapped(Head,File_Info.STRINGLENGTH,SAM[0]);
+		{
+			SAM[0] << SAM_Read.SAM_Line;
+			//Print_Unmapped(Head,File_Info.STRINGLENGTH,SAM[0]);
+		}
 	}
 	Join_Tables(Genome_Offsets,Thread_ID);
 
