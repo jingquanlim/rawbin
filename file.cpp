@@ -144,6 +144,8 @@ Read_Again:
 				assert(*NM=='N');
 				SAM.NM=atoi(NM+5);
 			}
+			else
+				SAM.NM=INT_MAX;
 
 			strcpy(Head.Tag_Copy,Head.Tag);
 			Head.NCount=0;int j=0;

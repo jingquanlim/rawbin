@@ -418,10 +418,15 @@ void *Map(void *T)
 				}	
 				else if(approvedPtr) 
 				{
-					for(int i=0; i<approvedPtr; i++) 
+					if(approvedPtr==1 && SAM_Read.NM!=INT_MAX && TD.Compiled_Junctions[selectedJunctions[0]].q==0)//batalign has exon hit..
 					{
-						Print_Hits(Head,TD.Compiled_Junctions,SAM[0],selectedJunctions[i],0,Err,Genome_Offsets,false,READLEN_T,Real_Skip);
+						SAM[0] << SAM_Read.SAM_Line;
 					}
+					else
+						for(int i=0; i<approvedPtr; i++) 
+						{
+							Print_Hits(Head,TD.Compiled_Junctions,SAM[0],selectedJunctions[i],0,Err,Genome_Offsets,false,READLEN_T,Real_Skip);
+						}
 				}
 				else
 				{
@@ -1903,6 +1908,8 @@ bool Messy_CIGAR(char *Cig,int StringLength)
 	int Len=0,Max_Len=0;
 	for(;*Cig;Cig++)
 	{
+		//if(*Cig=='S')
+		//	return true;
 		if(*Cig=='M')
 		{
 			*Cig=0;
