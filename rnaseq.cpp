@@ -394,8 +394,9 @@ void *Map(void *T)
 		}
 		else if(Mismatch_Scan>=0)//revert to match..
 		{
-			Print_Matches(MF,MC,Head,SAM[0],READLEN_T,Genome_Offsets,Mismatch_Scan);
-			continue;
+			assert(false);
+			//Print_Matches(MF,MC,Head,SAM[0],READLEN_T,Genome_Offsets,Mismatch_Scan);
+			//continue;
 		}
 
 		if(TD.Compiled_Junctions_Ptr)
@@ -413,20 +414,15 @@ void *Map(void *T)
 					if(ONEMULTIHIT) approvedPtr=1;
 					for(int i=0; i<approvedPtr; i++) 
 					{
-						Print_Hits(Head,TD.Compiled_Junctions,SAM[0],selectedJunctions[i],Hit_ID,Err,Genome_Offsets,true,READLEN_T,Real_Skip);
+						Print_Hits(Head,TD.Compiled_Junctions,SAM[0],selectedJunctions[i],Hit_ID,Err,Genome_Offsets,true,READLEN_T,Real_Skip,SAM_Read.NM,SAM_Read.SAM_Line);
 					}
 				}	
 				else if(approvedPtr) 
 				{
-					if(approvedPtr==1 && SAM_Read.NM!=INT_MAX && TD.Compiled_Junctions[selectedJunctions[0]].q==0)//batalign has exon hit..
+					for(int i=0; i<approvedPtr; i++) 
 					{
-						SAM[0] << SAM_Read.SAM_Line;
+						Print_Hits(Head,TD.Compiled_Junctions,SAM[0],selectedJunctions[i],0,Err,Genome_Offsets,false,READLEN_T,Real_Skip,SAM_Read.NM,SAM_Read.SAM_Line);
 					}
-					else
-						for(int i=0; i<approvedPtr; i++) 
-						{
-							Print_Hits(Head,TD.Compiled_Junctions,SAM[0],selectedJunctions[i],0,Err,Genome_Offsets,false,READLEN_T,Real_Skip);
-						}
 				}
 				else
 				{
@@ -448,7 +444,7 @@ void *Map(void *T)
 			{
 				assert(Type);
 				selectedJunctions[0]=0;TD.Partial_Junctions[0].Type=Type;
-				Print_Hits(Head,TD.Partial_Junctions,SAM[0],selectedJunctions[0],0,Err,Genome_Offsets,false,READLEN_T,Real_Skip);
+				Print_Hits(Head,TD.Partial_Junctions,SAM[0],selectedJunctions[0],0,Err,Genome_Offsets,false,READLEN_T,Real_Skip,SAM_Read.NM,SAM_Read.SAM_Line);
 			}
 			else
 			{
@@ -1835,7 +1831,7 @@ void Seek_Residue(int & GT_Ptr,int *GT,char* Current_Tag_ASCII,int StringLength,
 }
 
 
-void Print_Matches(MEMX & MF,MEMX & MC,READ & Head,ofstream & SAM,int StringLength,Offset_Record *Genome_Offsets,int Mismatches)
+/*void Print_Matches(MEMX & MF,MEMX & MC,READ & Head,ofstream & SAM,int StringLength,Offset_Record *Genome_Offsets,int Mismatches)
 {
 	unsigned Loc,Conversion_Factor=revfmi->textLength-StringLength+1;
 	if(MF.Hit_Array_Ptr) MF.Hit_Array_Ptr--;if(MC.Hit_Array_Ptr) MC.Hit_Array_Ptr--;
@@ -1892,7 +1888,7 @@ void Print_Matches(MEMX & MF,MEMX & MC,READ & Head,ofstream & SAM,int StringLeng
 				return;
 		}
 	}	
-}
+}*/
 
 void Print_Unmapped(READ & Head,int StringLength,ofstream & MISHIT)
 {
@@ -1905,7 +1901,7 @@ void Print_Unmapped(READ & Head,int StringLength,ofstream & MISHIT)
 bool Messy_CIGAR(char *Cig,int StringLength)
 {
 	char* Int_Start=Cig;
-	int Len=0,Max_Len=0;
+	int Len=0,Max_Len=0,Indels=0;
 	for(;*Cig;Cig++)
 	{
 		//if(*Cig=='S')
@@ -1920,13 +1916,18 @@ bool Messy_CIGAR(char *Cig,int StringLength)
 			}
 			Int_Start=Cig+1;
 		}
+		else if(*Cig=='I'|| *Cig=='D')
+		{
+			Int_Start=Cig+1;
+			Indels+=atoi(Int_Start);
+		}
 		else if(!isdigit(*Cig))
 		{
 			Int_Start=Cig+1;
 		}
 	}
 	assert(StringLength>=Max_Len);
-	if(!Max_Len)
+	if(!Max_Len || Indels>0)
 		return true;
 	if(StringLength-Max_Len>=5)
 		return true;

@@ -49,7 +49,7 @@ char* Nullify_String(char* S)
 	return Strend;
 }
 
-void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal,unsigned Hit_ID,int Err,Offset_Record *Genome_Offsets,bool Multi_Hits,int READLENX,int Read_Skip)
+void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal,unsigned Hit_ID,int Err,Offset_Record *Genome_Offsets,bool Multi_Hits,int READLENX,int Read_Skip,int NM,char* Org_SAM)
 {
 	Nullify_String(Head.Description+1);
 	Nullify_String(Head.Tag_Copy);
@@ -110,20 +110,33 @@ void Print_Hits(READ & Head,Junction *Final_Juncs,ofstream & SAM,int firstSignal
 			Q=Head.Quality;R=Head.Tag_Copy;
 		}
 
-		SAM << Head.Description+Off_Des <<"\t"
-			<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  
-			<< A.Name <<"\t" 
-			<< Final_Juncs[i].p-Final_Juncs[i].r+1 << "\t" 
-			<< (int)((Multi_Hits)? 0:60) <<"\t" 
-			<<CIGAR<<"\t"
-			<< "*\t0\t0\t" 
-			<< R << "\t" 
-			<< Q << "\t"
-			<< "XH:i:" << Final_Juncs[i].Mismatches <<"\t" << "XJ:i:" << Final_Juncs[i].score 
-			<<"\tXS:A:"<<(char) Canonical_Sign(Final_Juncs[i].signal)<<"\tER:i:"<<Err<<endl;
+		if(NM<=Final_Juncs[i].Mismatches)
+		{
+			SAM << Org_SAM;
+		}
+		else
+		{
+			SAM << Head.Description+Off_Des <<"\t"
+				<< ((Final_Juncs[i].Sign) ? 0:16) <<"\t"  
+				<< A.Name <<"\t" 
+				<< Final_Juncs[i].p-Final_Juncs[i].r+1 << "\t" 
+				<< (int)((Multi_Hits)? 0:60) <<"\t" 
+				<<CIGAR<<"\t"
+				<< "*\t0\t0\t" 
+				<< R << "\t" 
+				<< Q << "\t"
+				<< "XH:i:" << Final_Juncs[i].Mismatches <<"\t" << "XJ:i:" << Final_Juncs[i].score 
+				<<"\tXS:A:"<<(char) Canonical_Sign(Final_Juncs[i].signal)<<"\tER:i:"<<Err<<endl;
+		}
 	}
 	else//Full read map..
 	{
+		if(NM!=INT_MAX)
+		{
+			SAM << Org_SAM;
+			return;
+		}
+
 		assert(Final_Juncs[i].r==0);
 		Ann_Info A;
 		Location_To_Genome(Final_Juncs[i].p,A);
